@@ -50,15 +50,15 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           secrets: |
-            ANTHROPIC_API_KEY
             MOLTBOT_GATEWAY_TOKEN
+            CF_ACCOUNT_ID
+            WORKER_URL
+            ANTHROPIC_API_KEY
             CF_ACCESS_TEAM_DOMAIN
             CF_ACCESS_AUD
             R2_ACCESS_KEY_ID
             R2_SECRET_ACCESS_KEY
-            CF_ACCOUNT_ID
             MENTRA_API_KEY
-            WORKER_URL
             AI_GATEWAY_API_KEY
             AI_GATEWAY_BASE_URL
             AI_GATEWAY_MODEL
@@ -67,22 +67,24 @@ jobs:
             CF_AI_GATEWAY_GATEWAY_ID
             CF_AI_GATEWAY_MODEL
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Required
           MOLTBOT_GATEWAY_TOKEN: ${{ secrets.MOLTBOT_GATEWAY_TOKEN }}
-          CF_ACCESS_TEAM_DOMAIN: ${{ secrets.CF_ACCESS_TEAM_DOMAIN }}
-          CF_ACCESS_AUD: ${{ secrets.CF_ACCESS_AUD }}
-          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          MENTRA_API_KEY: ${{ secrets.MENTRA_API_KEY }}
           WORKER_URL: ${{ secrets.WORKER_URL }}
-          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
-          AI_GATEWAY_BASE_URL: ${{ secrets.AI_GATEWAY_BASE_URL }}
-          AI_GATEWAY_MODEL: ${{ secrets.AI_GATEWAY_MODEL }}
-          CLOUDFLARE_AI_GATEWAY_API_KEY: ${{ secrets.CLOUDFLARE_AI_GATEWAY_API_KEY }}
-          CF_AI_GATEWAY_ACCOUNT_ID: ${{ secrets.CF_AI_GATEWAY_ACCOUNT_ID }}
-          CF_AI_GATEWAY_GATEWAY_ID: ${{ secrets.CF_AI_GATEWAY_GATEWAY_ID }}
-          CF_AI_GATEWAY_MODEL: ${{ secrets.CF_AI_GATEWAY_MODEL }}
+          # Optional — default to empty string so wrangler-action doesn't error
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY || '' }}
+          CF_ACCESS_TEAM_DOMAIN: ${{ secrets.CF_ACCESS_TEAM_DOMAIN || '' }}
+          CF_ACCESS_AUD: ${{ secrets.CF_ACCESS_AUD || '' }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID || '' }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY || '' }}
+          MENTRA_API_KEY: ${{ secrets.MENTRA_API_KEY || '' }}
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY || '' }}
+          AI_GATEWAY_BASE_URL: ${{ secrets.AI_GATEWAY_BASE_URL || '' }}
+          AI_GATEWAY_MODEL: ${{ secrets.AI_GATEWAY_MODEL || '' }}
+          CLOUDFLARE_AI_GATEWAY_API_KEY: ${{ secrets.CLOUDFLARE_AI_GATEWAY_API_KEY || '' }}
+          CF_AI_GATEWAY_ACCOUNT_ID: ${{ secrets.CF_AI_GATEWAY_ACCOUNT_ID || '' }}
+          CF_AI_GATEWAY_GATEWAY_ID: ${{ secrets.CF_AI_GATEWAY_GATEWAY_ID || '' }}
+          CF_AI_GATEWAY_MODEL: ${{ secrets.CF_AI_GATEWAY_MODEL || '' }}
 
   preview:
     if: github.event_name == 'pull_request'
