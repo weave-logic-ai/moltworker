@@ -125,10 +125,34 @@ debug.get('/gateway-api', async (c) => {
   }
 });
 
-// GET /debug/cli - Test OpenClaw CLI commands
+// GET /debug/cli - Test OpenClaw CLI commands (allowlisted only)
 debug.get('/cli', async (c) => {
   const sandbox = c.get('sandbox');
   const cmd = c.req.query('cmd') || 'openclaw --help';
+
+  // G8 fix: Prevent command injection by allowlisting safe commands
+  const ALLOWED_PREFIXES = [
+    'openclaw --help',
+    'openclaw --version',
+    'openclaw devices list',
+    'openclaw config show',
+    'openclaw skills list',
+    'node --version',
+    'cat /proc/meminfo',
+    'df -h',
+    'uptime',
+  ];
+  const isAllowed = ALLOWED_PREFIXES.some((prefix) => cmd === prefix || cmd.startsWith(prefix + ' '));
+  if (!isAllowed) {
+    return c.json(
+      {
+        error: 'Command not allowed',
+        hint: 'Only allowlisted OpenClaw CLI and diagnostic commands are permitted',
+        allowed: ALLOWED_PREFIXES,
+      },
+      403,
+    );
+  }
 
   try {
     const proc = await sandbox.startProcess(cmd);

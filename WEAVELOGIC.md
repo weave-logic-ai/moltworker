@@ -62,7 +62,7 @@ This document covers the WeaveLogic additions to the moltworker (Moltbot Sandbox
 
 To register the augment on the Mentra Marketplace:
 
-1. Go to [Mentra Developer Portal](https://developer.mentra.com)
+1. Go to [Mentra Developer Console](https://console.mentra.glass)
 2. Create a new augment with package name `com.weavelogic.openclaw`
 3. Set the webhook URL to `https://your-worker.workers.dev/mentra/webhook`
 4. Enable permissions: microphone, camera, display, notifications

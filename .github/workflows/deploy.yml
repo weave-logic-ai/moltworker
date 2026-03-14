@@ -59,6 +59,13 @@ jobs:
             CF_ACCOUNT_ID
             MENTRA_API_KEY
             WORKER_URL
+            AI_GATEWAY_API_KEY
+            AI_GATEWAY_BASE_URL
+            AI_GATEWAY_MODEL
+            CLOUDFLARE_AI_GATEWAY_API_KEY
+            CF_AI_GATEWAY_ACCOUNT_ID
+            CF_AI_GATEWAY_GATEWAY_ID
+            CF_AI_GATEWAY_MODEL
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           MOLTBOT_GATEWAY_TOKEN: ${{ secrets.MOLTBOT_GATEWAY_TOKEN }}
@@ -69,6 +76,13 @@ jobs:
           CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           MENTRA_API_KEY: ${{ secrets.MENTRA_API_KEY }}
           WORKER_URL: ${{ secrets.WORKER_URL }}
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          AI_GATEWAY_BASE_URL: ${{ secrets.AI_GATEWAY_BASE_URL }}
+          AI_GATEWAY_MODEL: ${{ secrets.AI_GATEWAY_MODEL }}
+          CLOUDFLARE_AI_GATEWAY_API_KEY: ${{ secrets.CLOUDFLARE_AI_GATEWAY_API_KEY }}
+          CF_AI_GATEWAY_ACCOUNT_ID: ${{ secrets.CF_AI_GATEWAY_ACCOUNT_ID }}
+          CF_AI_GATEWAY_GATEWAY_ID: ${{ secrets.CF_AI_GATEWAY_GATEWAY_ID }}
+          CF_AI_GATEWAY_MODEL: ${{ secrets.CF_AI_GATEWAY_MODEL }}
 
   preview:
     if: github.event_name == 'pull_request'

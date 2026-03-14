@@ -36,6 +36,16 @@ mentraRoutes.get('/status', (c) => {
  * Forwards to the OpenClaw /api/chat endpoint and returns the response.
  */
 mentraRoutes.post('/webhook', async (c) => {
+  // G17 fix: Verify MENTRA_API_KEY if configured
+  const expectedKey = c.env.MENTRA_API_KEY;
+  if (expectedKey) {
+    const authHeader = c.req.header('Authorization');
+    const providedKey = authHeader?.replace('Bearer ', '');
+    if (providedKey !== expectedKey) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+  }
+
   const gatewayToken = c.env.MOLTBOT_GATEWAY_TOKEN;
   if (!gatewayToken) {
     return c.json({ error: 'Gateway token not configured' }, 503);
