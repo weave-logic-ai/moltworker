@@ -11,7 +11,12 @@ ANTHROPIC_API_KEY=sk-ant-...
 # CF_AI_GATEWAY_GATEWAY_ID=your-gateway-id
 # CF_AI_GATEWAY_MODEL=workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast
 
-# Legacy AI Gateway (still supported)
+# OpenRouter (recommended - access 200+ models via one API key)
+# AI_GATEWAY_API_KEY=sk-or-v1-...
+# AI_GATEWAY_BASE_URL=https://openrouter.ai/api/v1
+# AI_GATEWAY_MODEL=anthropic/claude-sonnet-4-5
+
+# Legacy Cloudflare AI Gateway (still supported)
 # AI_GATEWAY_API_KEY=your-key
 # AI_GATEWAY_BASE_URL=https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}/anthropic
 

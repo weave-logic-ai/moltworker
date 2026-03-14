@@ -144,6 +144,15 @@ describe('buildEnvVars', () => {
     expect(result.CF_ACCOUNT_ID).toBe('acct-123');
   });
 
+  // Legacy AI Gateway model override
+  it('passes AI_GATEWAY_MODEL to container', () => {
+    const env = createMockEnv({
+      AI_GATEWAY_MODEL: 'anthropic/claude-sonnet-4-5',
+    });
+    const result = buildEnvVars(env);
+    expect(result.AI_GATEWAY_MODEL).toBe('anthropic/claude-sonnet-4-5');
+  });
+
   it('combines all env vars correctly', () => {
     const env = createMockEnv({
       ANTHROPIC_API_KEY: 'sk-key',
