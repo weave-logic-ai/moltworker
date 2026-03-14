@@ -394,12 +394,22 @@ app.all('*', async (c) => {
       if (debugLogs) {
         console.log('[WS] Client closed:', event.code, event.reason);
       }
-      containerWs.close(event.code, event.reason);
+      // G12 fix: Map reserved close codes to valid ones
+      let code = event.code;
+      if (code === 1006 || code === 1005 || code === 1015) {
+        code = 1011; // "Unexpected Condition" — safe to send
+      }
+      containerWs.close(code, event.reason);
     });
 
     containerWs.addEventListener('close', (event) => {
       if (debugLogs) {
         console.log('[WS] Container closed:', event.code, event.reason);
+      }
+      // G12 fix: Map reserved close codes to valid ones
+      let code = event.code;
+      if (code === 1006 || code === 1005 || code === 1015) {
+        code = 1011; // "Unexpected Condition" — safe to send
       }
       // Transform the close reason (truncate to 123 bytes max for WebSocket spec)
       let reason = transformErrorMessage(event.reason, url.host);
@@ -409,7 +419,7 @@ app.all('*', async (c) => {
       if (debugLogs) {
         console.log('[WS] Transformed close reason:', reason);
       }
-      serverWs.close(event.code, reason);
+      serverWs.close(code, reason);
     });
 
     // Handle errors
