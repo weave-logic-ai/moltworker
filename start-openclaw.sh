@@ -219,6 +219,47 @@ if (process.env.CF_AI_GATEWAY_MODEL) {
     }
 }
 
+// Legacy AI Gateway model override (AI_GATEWAY_MODEL=provider/model-id)
+// Works with AI_GATEWAY_BASE_URL (e.g. OpenRouter). Sets a custom provider
+// entry and makes it the default model.
+// Examples:
+//   anthropic/claude-sonnet-4-5
+//   google/gemini-2.5-pro-preview
+//   meta-llama/llama-4-maverick
+if (process.env.AI_GATEWAY_MODEL && process.env.AI_GATEWAY_BASE_URL) {
+    const raw = process.env.AI_GATEWAY_MODEL;
+    const slashIdx = raw.indexOf('/');
+    let providerName, modelId;
+    if (slashIdx > 0) {
+        providerName = raw.substring(0, slashIdx);
+        modelId = raw.substring(slashIdx + 1);
+    } else {
+        providerName = 'openrouter';
+        modelId = raw;
+    }
+
+    const baseUrl = process.env.AI_GATEWAY_BASE_URL;
+    const apiKey = process.env.ANTHROPIC_API_KEY; // mapped from AI_GATEWAY_API_KEY by env.ts
+    const safeName = 'gw-' + providerName.replace(/[^a-zA-Z0-9-]/g, '-');
+
+    if (apiKey) {
+        config.models = config.models || {};
+        config.models.providers = config.models.providers || {};
+        config.models.providers[safeName] = {
+            baseUrl: baseUrl,
+            apiKey: apiKey,
+            api: 'openai-completions',
+            models: [{ id: modelId, name: modelId, contextWindow: 131072, maxTokens: 8192 }],
+        };
+        config.agents = config.agents || {};
+        config.agents.defaults = config.agents.defaults || {};
+        config.agents.defaults.model = { primary: safeName + '/' + modelId };
+        console.log('Legacy AI Gateway model override: provider=' + safeName + ' model=' + modelId + ' via ' + baseUrl);
+    } else {
+        console.warn('AI_GATEWAY_MODEL set but no API key available');
+    }
+}
+
 // Telegram configuration
 // Overwrite entire channel object to drop stale keys from old R2 backups
 // that would fail OpenClaw's strict config validation (see #47)

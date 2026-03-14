@@ -14,7 +14,8 @@ export interface MoltbotEnv {
   CF_AI_GATEWAY_MODEL?: string; // Override model: "provider/model-id" e.g. "workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast"
   // Legacy AI Gateway configuration (still supported for backward compat)
   AI_GATEWAY_API_KEY?: string; // API key for the provider configured in AI Gateway
-  AI_GATEWAY_BASE_URL?: string; // AI Gateway URL (e.g., https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}/anthropic)
+  AI_GATEWAY_BASE_URL?: string; // AI Gateway URL (e.g., https://openrouter.ai/api/v1)
+  AI_GATEWAY_MODEL?: string; // Override model: "provider/model-id" e.g. "anthropic/claude-sonnet-4-5"
   // Direct provider configuration
   ANTHROPIC_API_KEY?: string;
   ANTHROPIC_BASE_URL?: string;
@@ -42,6 +43,8 @@ export interface MoltbotEnv {
   BROWSER?: Fetcher;
   CDP_SECRET?: string; // Shared secret for CDP endpoint authentication
   WORKER_URL?: string; // Public URL of the worker (for CDP endpoint)
+  // MentraOS smart glasses bridge
+  MENTRA_API_KEY?: string; // API key for MentraOS integration
 }
 
 /**
