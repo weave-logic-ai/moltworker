@@ -49,6 +49,26 @@ jobs:
           command: deploy
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          secrets: |
+            ANTHROPIC_API_KEY
+            MOLTBOT_GATEWAY_TOKEN
+            CF_ACCESS_TEAM_DOMAIN
+            CF_ACCESS_AUD
+            R2_ACCESS_KEY_ID
+            R2_SECRET_ACCESS_KEY
+            CF_ACCOUNT_ID
+            MENTRA_API_KEY
+            WORKER_URL
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MOLTBOT_GATEWAY_TOKEN: ${{ secrets.MOLTBOT_GATEWAY_TOKEN }}
+          CF_ACCESS_TEAM_DOMAIN: ${{ secrets.CF_ACCESS_TEAM_DOMAIN }}
+          CF_ACCESS_AUD: ${{ secrets.CF_ACCESS_AUD }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          MENTRA_API_KEY: ${{ secrets.MENTRA_API_KEY }}
+          WORKER_URL: ${{ secrets.WORKER_URL }}
 
   preview:
     if: github.event_name == 'pull_request'
