@@ -49,32 +49,26 @@ jobs:
           command: deploy
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          secrets: |
-            ANTHROPIC_API_KEY
-            MOLTBOT_GATEWAY_TOKEN
-            CF_ACCESS_TEAM_DOMAIN
-            CF_ACCESS_AUD
-            R2_ACCESS_KEY_ID
-            R2_SECRET_ACCESS_KEY
-            CF_ACCOUNT_ID
-            MENTRA_API_KEY
-            WORKER_URL
-            AI_GATEWAY_API_KEY
-            AI_GATEWAY_BASE_URL
-            AI_GATEWAY_MODEL
+
+      - name: Upload secrets
+        run: |
+          echo '${{ toJSON(secrets) }}' | node -e '
+            const s = JSON.parse(require("fs").readFileSync(0,"utf8"));
+            const keep = [
+              "ANTHROPIC_API_KEY","MOLTBOT_GATEWAY_TOKEN","CF_ACCESS_TEAM_DOMAIN",
+              "CF_ACCESS_AUD","R2_ACCESS_KEY_ID","R2_SECRET_ACCESS_KEY",
+              "CF_ACCOUNT_ID","MENTRA_API_KEY","WORKER_URL",
+              "AI_GATEWAY_API_KEY","AI_GATEWAY_BASE_URL","AI_GATEWAY_MODEL"
+            ];
+            const out = {};
+            for (const k of keep) if (s[k]) out[k] = s[k];
+            // CF_ACCOUNT_ID comes from CLOUDFLARE_ACCOUNT_ID secret
+            if (s.CLOUDFLARE_ACCOUNT_ID) out.CF_ACCOUNT_ID = s.CLOUDFLARE_ACCOUNT_ID;
+            process.stdout.write(JSON.stringify(out));
+          ' | npx wrangler secret:bulk
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          MOLTBOT_GATEWAY_TOKEN: ${{ secrets.MOLTBOT_GATEWAY_TOKEN }}
-          CF_ACCESS_TEAM_DOMAIN: ${{ secrets.CF_ACCESS_TEAM_DOMAIN }}
-          CF_ACCESS_AUD: ${{ secrets.CF_ACCESS_AUD }}
-          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          MENTRA_API_KEY: ${{ secrets.MENTRA_API_KEY }}
-          WORKER_URL: ${{ secrets.WORKER_URL }}
-          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
-          AI_GATEWAY_BASE_URL: ${{ secrets.AI_GATEWAY_BASE_URL }}
-          AI_GATEWAY_MODEL: ${{ secrets.AI_GATEWAY_MODEL }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
   preview:
     if: github.event_name == 'pull_request'
