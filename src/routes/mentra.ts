@@ -8,6 +8,32 @@ import { ensureMoltbotGateway } from '../gateway';
 const VERSION = '1.0.0';
 const MENTRA_BRIDGE_PORT = 7010;
 
+/**
+ * Get a running MentraBridge container stub.
+ * Starts the container if not already running.
+ */
+async function getMentraBridge(env: AppEnv['Bindings']) {
+  const stub = env.MentraBridge.get(env.MentraBridge.idFromName('mentra-bridge'));
+  // Ensure container is started
+  try {
+    await (stub as any).startAndWaitForPorts({
+      startOptions: {
+        envVars: {
+          MENTRAOS_API_KEY: env.MENTRA_API_KEY || '',
+          MENTRA_API_KEY: env.MENTRA_API_KEY || '',
+          OPENCLAW_GATEWAY_TOKEN: env.MOLTBOT_GATEWAY_TOKEN || '',
+          OPENCLAW_URL: env.WORKER_URL || '',
+          MENTRA_PACKAGE_NAME: 'mentra-claw',
+        },
+      },
+    });
+  } catch (e) {
+    // May already be running
+    console.log('[Mentra] Bridge start/wait:', e instanceof Error ? e.message : '');
+  }
+  return stub;
+}
+
 export const mentraRoutes = new Hono<AppEnv>();
 
 /**
@@ -15,7 +41,7 @@ export const mentraRoutes = new Hono<AppEnv>();
  */
 mentraRoutes.get('/logs', async (c) => {
   try {
-    const bridgeStub = c.env.MentraBridge.get(c.env.MentraBridge.idFromName('mentra-bridge'));
+    const bridgeStub = await getMentraBridge(c.env);
     const resp = await bridgeStub.fetch(new Request('http://mentra-bridge/logs'));
     const text = await resp.text();
     return c.text(text);
@@ -118,7 +144,7 @@ mentraRoutes.post('/webhook', async (c) => {
   // Try forwarding to the MentraOS AppServer bridge on port 7010
   try {
     // Route to MentraBridge container (separate from Sandbox)
-    const bridgeStub = c.env.MentraBridge.get(c.env.MentraBridge.idFromName('mentra-bridge'));
+    const bridgeStub = await getMentraBridge(c.env);
     const bridgeResp = await bridgeStub.fetch(
       new Request(`http://mentra-bridge/webhook`, {
         method: 'POST',
@@ -216,7 +242,7 @@ mentraRoutes.all('/*', async (c) => {
     const url = new URL(c.req.url);
     const path = url.pathname.replace('/mentra', '') || '/';
 
-    const bridgeStub = c.env.MentraBridge.get(c.env.MentraBridge.idFromName('mentra-bridge'));
+    const bridgeStub = await getMentraBridge(c.env);
     const bridgeResp = await bridgeStub.fetch(
       new Request(`http://mentra-bridge${path}${url.search}`, {
         method: c.req.method,
