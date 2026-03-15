@@ -53,7 +53,7 @@ jobs:
       - name: Upload secrets via API
         run: |
           curl -sS -X PATCH \
-            "https://api.cloudflare.com/client/v4/accounts/${{ secrets.CLOUDFLARE_ACCOUNT_ID }}/workers/scripts/moltbot-sandbox/script-settings" \
+            "https://api.cloudflare.com/client/v4/accounts/${{ secrets.CLOUDFLARE_ACCOUNT_ID }}/workers/scripts/moltworker/script-settings" \
             -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
             -H "Content-Type: application/json" \
             -d '{
