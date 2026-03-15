@@ -373,35 +373,9 @@ fi
 # ============================================================
 # START MENTRA BRIDGE (background, after gateway is ready)
 # ============================================================
-MENTRA_BRIDGE="/root/clawd/skills/mentra-bridge/mentra-bridge.js"
-GLOBAL_NODE_MODULES=$(npm root -g)
-if [ -n "$MENTRA_API_KEY" ] && [ -f "$MENTRA_BRIDGE" ]; then
-    echo "Starting MentraOS bridge in background..."
-    echo "Global node_modules: $GLOBAL_NODE_MODULES"
-    (
-        # Wait for gateway to be ready
-        for i in $(seq 1 60); do
-            if curl -s -o /dev/null -w "%{http_code}" "http://localhost:18789/" 2>/dev/null | grep -qE '200|426'; then
-                echo "[mentra-bridge] Gateway ready, launching bridge..."
-                break
-            fi
-            sleep 5
-        done
-        export NODE_PATH="$GLOBAL_NODE_MODULES"
-        echo "[mentra-bridge] NODE_PATH=$NODE_PATH" >> /tmp/mentra-bridge.log
-        echo "[mentra-bridge] Starting at $(date)" >> /tmp/mentra-bridge.log
-        MENTRAOS_API_KEY="$MENTRA_API_KEY" \
-        MENTRA_API_KEY="$MENTRA_API_KEY" \
-        MENTRA_PACKAGE_NAME="${MENTRA_PACKAGE_NAME:-mentra-claw}" \
-        OPENCLAW_GATEWAY_TOKEN="$OPENCLAW_GATEWAY_TOKEN" \
-        MENTRA_VISION_MODEL="${MENTRA_VISION_MODEL:-}" \
-        node "$MENTRA_BRIDGE" >> /tmp/mentra-bridge.log 2>&1
-        echo "[mentra-bridge] Process exited with code $? at $(date)" >> /tmp/mentra-bridge.log
-    ) &
-    echo "MentraOS bridge starting in background (PID: $!)"
-else
-    echo "MentraOS bridge skipped (MENTRA_API_KEY=${MENTRA_API_KEY:+set} BRIDGE=${MENTRA_BRIDGE})"
-fi
+# MentraBridge now runs in its own separate container (Dockerfile.mentra)
+# No longer started here — see wrangler.jsonc containers[1]
+echo "MentraBridge runs in separate container"
 
 # ============================================================
 # START GATEWAY
