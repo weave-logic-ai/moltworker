@@ -99,17 +99,11 @@ else
 fi
 
 # ============================================================
-# DOWNGRADE OPENCLAW IF AUTO-UPDATED TO BROKEN VERSION
+# OPENCLAW VERSION
 # ============================================================
-# OpenClaw 2026.3.13 requires Node >=22.16.0 but container has 22.13.1
-# and has breaking changes with the agent response pipeline.
-# Pin to 2026.2.3 until Node is updated in the Dockerfile.
-CURRENT_VERSION=$(openclaw --version 2>/dev/null | head -1 || echo "unknown")
-if [ "$CURRENT_VERSION" != "2026.2.3" ]; then
-    echo "OpenClaw version $CURRENT_VERSION detected, pinning to 2026.2.3..."
-    npm install -g openclaw@2026.2.3 2>&1 | tail -3
-    echo "Pinned to $(openclaw --version 2>/dev/null | head -1)"
-fi
+# Version pinned in Dockerfile. Disable auto-update at runtime.
+export OPENCLAW_NO_UPDATE=1
+echo "OpenClaw version: $(openclaw --version 2>/dev/null | head -1)"
 
 # ============================================================
 # ENSURE WORKSPACE TEMPLATES EXIST
