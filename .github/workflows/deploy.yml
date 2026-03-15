@@ -50,14 +50,28 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      - name: Upload secrets
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Upload secrets via API
         run: |
-          cat <<'SECRETS_EOF' | npx wrangler secret bulk
-          {"ANTHROPIC_API_KEY":"${{ secrets.ANTHROPIC_API_KEY }}","MOLTBOT_GATEWAY_TOKEN":"${{ secrets.MOLTBOT_GATEWAY_TOKEN }}","CF_ACCESS_TEAM_DOMAIN":"${{ secrets.CF_ACCESS_TEAM_DOMAIN }}","CF_ACCESS_AUD":"${{ secrets.CF_ACCESS_AUD }}","R2_ACCESS_KEY_ID":"${{ secrets.R2_ACCESS_KEY_ID }}","R2_SECRET_ACCESS_KEY":"${{ secrets.R2_SECRET_ACCESS_KEY }}","CF_ACCOUNT_ID":"${{ secrets.CLOUDFLARE_ACCOUNT_ID }}","MENTRA_API_KEY":"${{ secrets.MENTRA_API_KEY }}","WORKER_URL":"${{ secrets.WORKER_URL }}","AI_GATEWAY_API_KEY":"${{ secrets.AI_GATEWAY_API_KEY }}","AI_GATEWAY_BASE_URL":"${{ secrets.AI_GATEWAY_BASE_URL }}","AI_GATEWAY_MODEL":"${{ secrets.AI_GATEWAY_MODEL }}"}
-          SECRETS_EOF
+          curl -sS -X PATCH \
+            "https://api.cloudflare.com/client/v4/accounts/${{ secrets.CLOUDFLARE_ACCOUNT_ID }}/workers/scripts/moltbot-sandbox/script-settings" \
+            -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "bindings": [
+                {"type":"secret_text","name":"ANTHROPIC_API_KEY","text":"${{ secrets.ANTHROPIC_API_KEY }}"},
+                {"type":"secret_text","name":"MOLTBOT_GATEWAY_TOKEN","text":"${{ secrets.MOLTBOT_GATEWAY_TOKEN }}"},
+                {"type":"secret_text","name":"CF_ACCESS_TEAM_DOMAIN","text":"${{ secrets.CF_ACCESS_TEAM_DOMAIN }}"},
+                {"type":"secret_text","name":"CF_ACCESS_AUD","text":"${{ secrets.CF_ACCESS_AUD }}"},
+                {"type":"secret_text","name":"R2_ACCESS_KEY_ID","text":"${{ secrets.R2_ACCESS_KEY_ID }}"},
+                {"type":"secret_text","name":"R2_SECRET_ACCESS_KEY","text":"${{ secrets.R2_SECRET_ACCESS_KEY }}"},
+                {"type":"secret_text","name":"CF_ACCOUNT_ID","text":"${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"},
+                {"type":"secret_text","name":"MENTRA_API_KEY","text":"${{ secrets.MENTRA_API_KEY }}"},
+                {"type":"secret_text","name":"WORKER_URL","text":"${{ secrets.WORKER_URL }}"},
+                {"type":"secret_text","name":"AI_GATEWAY_API_KEY","text":"${{ secrets.AI_GATEWAY_API_KEY }}"},
+                {"type":"secret_text","name":"AI_GATEWAY_BASE_URL","text":"${{ secrets.AI_GATEWAY_BASE_URL }}"},
+                {"type":"secret_text","name":"AI_GATEWAY_MODEL","text":"${{ secrets.AI_GATEWAY_MODEL }}"}
+              ]
+            }' | jq -e '.success' || echo "Warning: secrets upload returned non-success (secrets may already be set)"
 
   preview:
     if: github.event_name == 'pull_request'
