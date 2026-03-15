@@ -99,6 +99,19 @@ else
 fi
 
 # ============================================================
+# ENSURE WORKSPACE TEMPLATES EXIST
+# ============================================================
+# OpenClaw 2026.3.13+ expects AGENTS.md in its templates dir.
+# After auto-update the file may be missing. Create a stub if needed.
+OPENCLAW_ROOT=$(npm root -g)/openclaw
+TEMPLATES_DIR="$OPENCLAW_ROOT/docs/reference/templates"
+if [ -d "$OPENCLAW_ROOT" ] && [ ! -f "$TEMPLATES_DIR/AGENTS.md" ]; then
+    echo "Creating missing AGENTS.md template..."
+    mkdir -p "$TEMPLATES_DIR"
+    echo "# Agent Instructions" > "$TEMPLATES_DIR/AGENTS.md"
+fi
+
+# ============================================================
 # ONBOARD (only if no config exists yet)
 # ============================================================
 if [ ! -f "$CONFIG_FILE" ]; then
