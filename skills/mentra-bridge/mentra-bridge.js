@@ -297,17 +297,31 @@ class OpenClawBridge extends AppServer {
 
     console.log(`[mentra-bridge] ========================================`);
     console.log(`[mentra-bridge] ALL HANDLERS REGISTERED for ${sessionId}`);
-    console.log(`[mentra-bridge]   onTranscription: YES`);
-    console.log(`[mentra-bridge]   onPhotoTaken: YES`);
-    console.log(`[mentra-bridge]   onButtonPress: YES`);
-    console.log(`[mentra-bridge]   onHeadPosition: YES`);
-    console.log(`[mentra-bridge]   onPhoneNotifications: YES`);
-    console.log(`[mentra-bridge]   onGlassesBattery: YES`);
-    console.log(`[mentra-bridge]   onDisconnected: YES`);
-    console.log(`[mentra-bridge]   onReconnected: YES`);
-    console.log(`[mentra-bridge]   onError: YES`);
     console.log(`[mentra-bridge] Waiting for events from glasses...`);
     console.log(`[mentra-bridge] ========================================`);
+
+    // Force subscription update — the SDK's bug007-fix-v2 patch may have
+    // already counted 0 handlers before we registered them.
+    // Manually trigger subscription refresh after handlers are set.
+    try {
+      if (session.updateSubscriptions) {
+        console.log(`[mentra-bridge] Calling updateSubscriptions manually...`);
+        await session.updateSubscriptions();
+        console.log(`[mentra-bridge] Subscriptions updated`);
+      } else if (session._updateSubscriptions) {
+        console.log(`[mentra-bridge] Calling _updateSubscriptions...`);
+        await session._updateSubscriptions();
+        console.log(`[mentra-bridge] Subscriptions updated (internal)`);
+      } else {
+        console.log(`[mentra-bridge] No updateSubscriptions method found`);
+        // Try to access internal subscription manager
+        const methods = Object.getOwnPropertyNames(Object.getPrototypeOf(session))
+          .filter(m => m.toLowerCase().includes('subscri'));
+        console.log(`[mentra-bridge] Subscription-related methods:`, methods);
+      }
+    } catch (e) {
+      console.error(`[mentra-bridge] updateSubscriptions error:`, e.message);
+    }
   }
 
   // ── Tool calls (AI-triggered actions) ────────────────────────
