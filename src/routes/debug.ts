@@ -139,6 +139,8 @@ debug.get('/cli', async (c) => {
     'openclaw skills list',
     'node --version',
     'cat /proc/meminfo',
+    'cat /tmp/mentra-bridge.log',
+    'ps aux',
     'df -h',
     'uptime',
   ];
