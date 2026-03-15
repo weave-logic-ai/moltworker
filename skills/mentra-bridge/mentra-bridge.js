@@ -343,8 +343,30 @@ async function main() {
 
   const server = new OpenClawBridge();
 
-  // Add webview route before starting
+  // Add routes before starting
   const app = server.getExpressApp();
+
+  // Log buffer for debugging
+  const logBuffer = [];
+  const origLog = console.log;
+  const origErr = console.error;
+  console.log = (...args) => {
+    const msg = args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ');
+    logBuffer.push(msg);
+    if (logBuffer.length > 200) logBuffer.shift();
+    origLog.apply(console, args);
+  };
+  console.error = (...args) => {
+    const msg = 'ERROR: ' + args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ');
+    logBuffer.push(msg);
+    if (logBuffer.length > 200) logBuffer.shift();
+    origErr.apply(console, args);
+  };
+
+  // Logs endpoint
+  app.get('/logs', (req, res) => {
+    res.type('text/plain').send(logBuffer.join('\n'));
+  });
   app.get('/webview', (req, res) => {
     res.send(`<!DOCTYPE html>
 <html><head>
