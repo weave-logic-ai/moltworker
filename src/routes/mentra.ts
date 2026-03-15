@@ -34,6 +34,59 @@ mentraRoutes.get('/status', (c) => {
 });
 
 /**
+ * GET /webview — Phone companion app webview
+ */
+mentraRoutes.get('/webview', (c) => {
+  return c.html(`<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clawdflare Bridge</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #0f0f1a; color: #e0e0e0; padding: 16px; min-height: 100vh; }
+  h1 { color: #e94560; font-size: 1.3em; margin-bottom: 12px; text-align: center; }
+  .card { background: #1a1a2e; border-radius: 12px; padding: 14px; margin: 10px 0; border-left: 3px solid #0f3460; }
+  .card h2 { color: #e94560; font-size: 1em; margin-bottom: 6px; }
+  .card p { line-height: 1.5; color: #b0b0b0; font-size: 0.9em; }
+  .status { display: flex; justify-content: space-between; align-items: center; }
+  .badge { background: #16213e; padding: 4px 12px; border-radius: 20px; font-size: 0.8em; color: #4ecca3; }
+  .chat { background: #16213e; border-radius: 12px; padding: 14px; margin: 10px 0; }
+  .chat-log { max-height: 300px; overflow-y: auto; margin-bottom: 10px; }
+  .msg { padding: 8px 12px; margin: 6px 0; border-radius: 8px; font-size: 0.9em; }
+  .msg-user { background: #0f3460; text-align: right; }
+  .msg-ai { background: #1a3a2e; border-left: 2px solid #4ecca3; }
+  .msg-system { color: #666; font-style: italic; text-align: center; font-size: 0.8em; }
+  .cmd { background: #16213e; padding: 6px 10px; border-radius: 8px; margin: 4px 0; font-family: monospace; font-size: 0.85em; color: #4ecca3; }
+  #refreshBtn { background: #0f3460; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; width: 100%; margin-top: 8px; font-size: 0.9em; cursor: pointer; }
+</style>
+</head><body>
+<h1>Clawdflare Bridge</h1>
+<div class="card">
+  <div class="status"><h2>AI Assistant</h2><span class="badge">Active</span></div>
+  <p>Speak to your glasses — AI responds via audio.</p>
+</div>
+<div class="chat">
+  <h2 style="color:#e94560;font-size:1em;margin-bottom:8px;">Conversation</h2>
+  <div class="chat-log" id="chatLog">
+    <div class="msg msg-system">Speak to your glasses to start a conversation. Responses will appear here and be spoken aloud.</div>
+  </div>
+  <button id="refreshBtn" onclick="location.reload()">Refresh</button>
+</div>
+<div class="card">
+  <h2>Controls</h2>
+  <div class="cmd">Speak → AI responds via audio</div>
+  <div class="cmd">Short press → Listen mode</div>
+  <div class="cmd">Long press → Capture photo + Analyze</div>
+</div>
+<div class="card">
+  <h2>Your Glasses</h2>
+  <p>No display — all AI responses are spoken through the glasses speaker. This webview shows conversation history and detailed results.</p>
+</div>
+</body></html>`);
+});
+
+/**
  * POST /webhook — Proxy to MentraOS AppServer inside the container.
  * The AppServer handles the session lifecycle and WebSocket to MentraOS Cloud.
  * Falls back to direct OpenClaw chat if the bridge isn't running.
