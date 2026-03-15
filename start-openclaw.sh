@@ -388,11 +388,14 @@ if [ -n "$MENTRA_API_KEY" ] && [ -f "$MENTRA_BRIDGE" ]; then
             sleep 5
         done
         export NODE_PATH="$GLOBAL_NODE_MODULES"
+        echo "[mentra-bridge] NODE_PATH=$NODE_PATH" >> /tmp/mentra-bridge.log
+        echo "[mentra-bridge] Starting at $(date)" >> /tmp/mentra-bridge.log
         MENTRAOS_API_KEY="$MENTRA_API_KEY" \
         MENTRA_API_KEY="$MENTRA_API_KEY" \
         OPENCLAW_GATEWAY_TOKEN="$OPENCLAW_GATEWAY_TOKEN" \
         MENTRA_VISION_MODEL="${MENTRA_VISION_MODEL:-}" \
-        node "$MENTRA_BRIDGE" 2>&1
+        node "$MENTRA_BRIDGE" >> /tmp/mentra-bridge.log 2>&1
+        echo "[mentra-bridge] Process exited with code $? at $(date)" >> /tmp/mentra-bridge.log
     ) &
     echo "MentraOS bridge starting in background (PID: $!)"
 else
