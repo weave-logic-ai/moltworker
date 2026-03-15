@@ -66,11 +66,19 @@ mentraRoutes.post('/webhook', async (c) => {
     const sandbox = c.get('sandbox');
     await ensureMoltbotGateway(sandbox, c.env);
 
-    const chatBody: Record<string, string> = { message };
-    if (body.imageData) chatBody.imageData = body.imageData;
+    // Use OpenAI Chat Completions API format
+    const messages: Array<{ role: string; content: string }> = [
+      { role: 'user', content: message },
+    ];
+
+    const chatBody = {
+      model: 'gw-openrouter/google/gemini-2.0-flash-001',
+      messages,
+      max_tokens: 256,
+    };
 
     const gatewayResp = await sandbox.containerFetch(
-      new Request(`http://localhost:${MOLTBOT_PORT}/api/chat`, {
+      new Request(`http://localhost:${MOLTBOT_PORT}/v1/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -86,11 +94,14 @@ mentraRoutes.post('/webhook', async (c) => {
       throw new Error(`Gateway returned ${gatewayResp.status}: ${text.substring(0, 200)}`);
     }
 
-    const data = (await gatewayResp.json()) as { response: string };
+    const data = (await gatewayResp.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    const responseText = data.choices?.[0]?.message?.content || 'No response';
 
     return c.json({
       success: true,
-      response: formatForGlasses(data.response),
+      response: formatForGlasses(responseText),
     });
   } catch (err) {
     console.error('[Mentra] Webhook query failed:', err);
