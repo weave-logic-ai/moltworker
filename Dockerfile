@@ -25,6 +25,10 @@ RUN npm install -g pnpm
 RUN npm install -g openclaw@2026.2.3 \
     && openclaw --version
 
+# Install MentraOS SDK for glasses bridge
+RUN npm install -g @mentra/sdk \
+    && echo "MentraOS SDK installed"
+
 # Create OpenClaw directories
 # Legacy .clawdbot paths are kept for R2 backup migration
 RUN mkdir -p /root/.openclaw \
@@ -42,5 +46,5 @@ COPY skills/ /root/clawd/skills/
 # Set working directory
 WORKDIR /root/clawd
 
-# Expose the gateway port
-EXPOSE 18789
+# Expose the gateway port and MentraOS bridge port
+EXPOSE 18789 7010

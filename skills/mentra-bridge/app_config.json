@@ -1,0 +1,45 @@
+{
+  "packageName": "com.weavelogic.openclaw",
+  "displayName": "WeaveLogic AI",
+  "description": "AI assistant powered by OpenClaw with multi-model support via OpenRouter",
+  "version": "1.0.0",
+  "permissions": [
+    { "type": "MICROPHONE", "description": "Voice commands and transcription" },
+    { "type": "CAMERA", "description": "Photo capture for AI vision analysis" },
+    { "type": "LOCATION", "description": "Location-aware AI responses" },
+    { "type": "READ_NOTIFICATIONS", "description": "Forward important phone notifications" },
+    { "type": "POST_NOTIFICATIONS", "description": "Display AI responses as notifications" }
+  ],
+  "tools": [
+    {
+      "id": "ask_ai",
+      "description": "Ask the AI assistant a question",
+      "activationPhrases": ["ask ai", "ask openclaw", "ask weavelogic"],
+      "parameters": {
+        "question": { "type": "string", "description": "The question to ask" }
+      }
+    },
+    {
+      "id": "capture_photo",
+      "description": "Capture a photo from the glasses camera",
+      "activationPhrases": ["take a photo", "capture photo", "what do you see"],
+      "parameters": {}
+    }
+  ],
+  "settings": [
+    {
+      "type": "toggle",
+      "key": "show_notifications",
+      "label": "Show phone notifications",
+      "defaultValue": true,
+      "description": "Display high-priority phone notifications on the glasses HUD"
+    },
+    {
+      "type": "toggle",
+      "key": "auto_photo_analysis",
+      "label": "Auto-analyze photos",
+      "defaultValue": true,
+      "description": "Automatically analyze photos with AI when taken"
+    }
+  ]
+}

@@ -187,7 +187,9 @@ config.gateway.trustedProxies = ['10.1.0.0'];
 
 if (process.env.OPENCLAW_GATEWAY_TOKEN) {
     config.gateway.auth = config.gateway.auth || {};
+    config.gateway.auth.mode = 'token';
     config.gateway.auth.token = process.env.OPENCLAW_GATEWAY_TOKEN;
+    console.log('Gateway token set in config (length: ' + process.env.OPENCLAW_GATEWAY_TOKEN.length + ')');
 }
 
 if (process.env.OPENCLAW_DEV_MODE === 'true') {
@@ -374,6 +376,29 @@ if r2_configured; then
         done
     ) &
     echo "Background sync loop started (PID: $!)"
+fi
+
+# ============================================================
+# START MENTRA BRIDGE (background, after gateway is ready)
+# ============================================================
+MENTRA_BRIDGE="/root/clawd/skills/mentra-bridge/mentra-bridge.js"
+if [ -n "$MENTRA_API_KEY" ] && [ -f "$MENTRA_BRIDGE" ]; then
+    echo "Starting MentraOS bridge in background..."
+    (
+        # Wait for gateway to be ready
+        for i in $(seq 1 60); do
+            if curl -s -o /dev/null -w "%{http_code}" "http://localhost:18789/" 2>/dev/null | grep -qE '200|426'; then
+                break
+            fi
+            sleep 5
+        done
+        echo "[mentra-bridge] Gateway ready, launching bridge..."
+        MENTRAOS_API_KEY="$MENTRA_API_KEY" \
+        OPENCLAW_GATEWAY_TOKEN="$OPENCLAW_GATEWAY_TOKEN" \
+        MENTRA_VISION_MODEL="${MENTRA_VISION_MODEL:-}" \
+        node "$MENTRA_BRIDGE" 2>&1 | while read -r line; do echo "[mentra] $line"; done
+    ) &
+    echo "MentraOS bridge starting in background (PID: $!)"
 fi
 
 # ============================================================
