@@ -392,6 +392,7 @@ if [ -n "$MENTRA_API_KEY" ] && [ -f "$MENTRA_BRIDGE" ]; then
         echo "[mentra-bridge] Starting at $(date)" >> /tmp/mentra-bridge.log
         MENTRAOS_API_KEY="$MENTRA_API_KEY" \
         MENTRA_API_KEY="$MENTRA_API_KEY" \
+        MENTRA_PACKAGE_NAME="${MENTRA_PACKAGE_NAME:-mentra-claw}" \
         OPENCLAW_GATEWAY_TOKEN="$OPENCLAW_GATEWAY_TOKEN" \
         MENTRA_VISION_MODEL="${MENTRA_VISION_MODEL:-}" \
         node "$MENTRA_BRIDGE" >> /tmp/mentra-bridge.log 2>&1
