@@ -201,6 +201,16 @@ app.use('*', async (c, next) => {
 
 // Middleware: Cloudflare Access authentication for protected routes
 app.use('*', async (c, next) => {
+  const url = new URL(c.req.url);
+
+  // Skip CF Access auth for the catch-all proxy when Access isn't configured.
+  // The gateway token (injected server-side) handles auth for the Control UI.
+  // Only enforce CF Access on admin/debug routes where it's explicitly needed.
+  const isAdminRoute = url.pathname.startsWith('/_admin') || url.pathname.startsWith('/api/admin') || url.pathname.startsWith('/debug');
+  if (!isAdminRoute && !c.env.CF_ACCESS_TEAM_DOMAIN) {
+    return next();
+  }
+
   // Determine response type based on Accept header
   const acceptsHtml = c.req.header('Accept')?.includes('text/html');
   const middleware = createAccessMiddleware({
