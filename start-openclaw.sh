@@ -101,8 +101,6 @@ fi
 # ============================================================
 # OPENCLAW VERSION
 # ============================================================
-# Version pinned in Dockerfile. Disable auto-update at runtime.
-export OPENCLAW_NO_UPDATE=1
 echo "OpenClaw version: $(openclaw --version 2>/dev/null | head -1)"
 
 # ============================================================
