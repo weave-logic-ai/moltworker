@@ -9,7 +9,7 @@ import type { MoltbotEnv } from './types';
  */
 export class MentraBridge extends Container<MoltbotEnv> {
   defaultPort = 7010;
-  sleepAfter = 'never';
+  sleepAfter = '24h';
   enableInternet = true;
 
   override onStart(): void {
