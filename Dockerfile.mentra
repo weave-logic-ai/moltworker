@@ -1,0 +1,15 @@
+FROM node:22-slim
+
+# Install @mentra/sdk
+RUN npm install -g @mentra/sdk && echo "MentraOS SDK installed"
+
+# Create app directory
+WORKDIR /app
+
+# Copy bridge script and config
+COPY skills/mentra-bridge/mentra-bridge.js /app/mentra-bridge.js
+COPY skills/mentra-bridge/app_config.json /app/app_config.json
+
+EXPOSE 7010
+
+CMD ["node", "/app/mentra-bridge.js"]

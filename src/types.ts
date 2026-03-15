@@ -5,6 +5,7 @@ import type { Sandbox } from '@cloudflare/sandbox';
  */
 export interface MoltbotEnv {
   Sandbox: DurableObjectNamespace<Sandbox>;
+  MentraBridge: DurableObjectNamespace;
   ASSETS: Fetcher; // Assets binding for admin UI static files
   MOLTBOT_BUCKET: R2Bucket; // R2 bucket for persistent storage
   // Cloudflare AI Gateway configuration (preferred)
