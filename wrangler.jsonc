@@ -49,11 +49,6 @@
       },
     ],
   },
-  // Pin Durable Object (and container) to US East Coast
-  "placement": {
-    "mode": "smart",
-    "hint": "enam",
-  },
   "migrations": [
     {
       "new_sqlite_classes": ["Sandbox"],
