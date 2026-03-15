@@ -363,9 +363,7 @@ echo "Dev mode: ${OPENCLAW_DEV_MODE:-false}"
 
 if [ -n "$OPENCLAW_GATEWAY_TOKEN" ]; then
     echo "Starting gateway with token auth..."
-    # G9 fix: Pass token via env var instead of CLI arg to avoid exposure in ps output
-    export OPENCLAW_GATEWAY_TOKEN
-    exec openclaw gateway --port 18789 --verbose --allow-unconfigured --bind lan
+    exec openclaw gateway --port 18789 --verbose --allow-unconfigured --bind lan --token "$OPENCLAW_GATEWAY_TOKEN"
 else
     echo "Starting gateway with device pairing (no token)..."
     exec openclaw gateway --port 18789 --verbose --allow-unconfigured --bind lan
