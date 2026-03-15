@@ -247,6 +247,22 @@ app.all('*', async (c) => {
 
   console.log('[PROXY] Handling request:', url.pathname);
 
+  // Persist gateway token in a secure cookie so it survives page reloads/redirects.
+  // When ?token= is present, set the cookie. On subsequent requests, read from cookie.
+  if (url.searchParams.has('token') && c.env.MOLTBOT_GATEWAY_TOKEN) {
+    const token = url.searchParams.get('token');
+    if (token === c.env.MOLTBOT_GATEWAY_TOKEN) {
+      c.header('Set-Cookie', `_gw_token=${token}; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=604800`);
+    }
+  }
+  if (!url.searchParams.has('token') && c.env.MOLTBOT_GATEWAY_TOKEN) {
+    const cookies = request.headers.get('Cookie') || '';
+    const match = cookies.match(/_gw_token=([a-f0-9]+)/);
+    if (match && match[1] === c.env.MOLTBOT_GATEWAY_TOKEN) {
+      url.searchParams.set('token', match[1]);
+    }
+  }
+
   // Check if gateway is already running
   const existingProcess = await findExistingMoltbotProcess(sandbox);
   const isGatewayReady = existingProcess !== null && existingProcess.status === 'running';
