@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
 import type { AppEnv } from '../types';
 import { formatForGlasses } from '../mentra/display-format';
-import { queryOpenClaw } from '../mentra/glass-bridge';
+import { MOLTBOT_PORT } from '../config';
+import { ensureMoltbotGateway } from '../gateway';
 
 const VERSION = '1.0.0';
 
@@ -51,8 +52,6 @@ mentraRoutes.post('/webhook', async (c) => {
     return c.json({ error: 'Gateway token not configured' }, 503);
   }
 
-  const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
-
   let body: { type?: string; text?: string; imageData?: string };
   try {
     body = await c.req.json();
@@ -63,14 +62,35 @@ mentraRoutes.post('/webhook', async (c) => {
   const message = body.text || 'What do you see? Be concise.';
 
   try {
-    const response = await queryOpenClaw(
-      { gatewayUrl: workerUrl, gatewayToken },
-      { message, imageData: body.imageData },
+    // Call gateway directly inside the container — bypasses CF Access and Worker proxy
+    const sandbox = c.get('sandbox');
+    await ensureMoltbotGateway(sandbox, c.env);
+
+    const chatBody: Record<string, string> = { message };
+    if (body.imageData) chatBody.imageData = body.imageData;
+
+    const gatewayResp = await sandbox.containerFetch(
+      new Request(`http://localhost:${MOLTBOT_PORT}/api/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${gatewayToken}`,
+        },
+        body: JSON.stringify(chatBody),
+      }),
+      MOLTBOT_PORT,
     );
+
+    if (!gatewayResp.ok) {
+      const text = await gatewayResp.text().catch(() => '');
+      throw new Error(`Gateway returned ${gatewayResp.status}: ${text.substring(0, 200)}`);
+    }
+
+    const data = (await gatewayResp.json()) as { response: string };
 
     return c.json({
       success: true,
-      response: formatForGlasses(response),
+      response: formatForGlasses(data.response),
     });
   } catch (err) {
     console.error('[Mentra] Webhook query failed:', err);
