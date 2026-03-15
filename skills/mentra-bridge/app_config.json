@@ -1,5 +1,5 @@
 {
-  "packageName": "com.weavelogic.openclaw",
+  "packageName": "mentra-claw",
   "displayName": "WeaveLogic AI",
   "description": "AI assistant powered by OpenClaw with multi-model support via OpenRouter",
   "version": "1.0.0",
