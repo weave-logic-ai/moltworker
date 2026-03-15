@@ -11,6 +11,20 @@ const MENTRA_BRIDGE_PORT = 7010;
 export const mentraRoutes = new Hono<AppEnv>();
 
 /**
+ * GET /logs — Read bridge container logs
+ */
+mentraRoutes.get('/logs', async (c) => {
+  try {
+    const bridgeStub = c.env.MentraBridge.get(c.env.MentraBridge.idFromName('mentra-bridge'));
+    const resp = await bridgeStub.fetch(new Request('http://mentra-bridge/logs'));
+    const text = await resp.text();
+    return c.text(text);
+  } catch (err) {
+    return c.json({ error: 'Cannot read bridge logs', details: err instanceof Error ? err.message : '' }, 502);
+  }
+});
+
+/**
  * GET /health — Simple health check for monitoring
  */
 mentraRoutes.get('/health', (c) => {
