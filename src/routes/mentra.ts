@@ -37,11 +37,19 @@ mentraRoutes.get('/status', (c) => {
  * Forwards to the OpenClaw /api/chat endpoint and returns the response.
  */
 mentraRoutes.post('/webhook', async (c) => {
-  // G17 fix: Verify MENTRA_API_KEY if configured
+  // Log incoming headers for debugging MentraOS webhook format
+  console.log('[Mentra] Webhook headers:', JSON.stringify(Object.fromEntries(
+    [...c.req.raw.headers.entries()].filter(([k]) => !k.includes('cookie') && !k.includes('cf-access')),
+  )));
+
+  // Verify API key — accept via Authorization Bearer, x-api-key header, or ?key= query param
   const expectedKey = c.env.MENTRA_API_KEY;
   if (expectedKey) {
     const authHeader = c.req.header('Authorization');
-    const providedKey = authHeader?.replace('Bearer ', '');
+    const bearerKey = authHeader?.replace('Bearer ', '');
+    const xApiKey = c.req.header('x-api-key');
+    const queryKey = new URL(c.req.url).searchParams.get('key');
+    const providedKey = bearerKey || xApiKey || queryKey;
     if (providedKey !== expectedKey) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
