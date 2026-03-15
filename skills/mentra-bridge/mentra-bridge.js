@@ -291,6 +291,37 @@ async function main() {
   }
 
   const server = new OpenClawBridge();
+
+  // Add webview route before starting
+  const app = server.getExpressApp();
+  app.get('/webview', (req, res) => {
+    res.send(`<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WeaveLogic AI</title>
+<style>
+  body { font-family: -apple-system, sans-serif; margin: 0; padding: 20px; background: #1a1a2e; color: #eee; }
+  h1 { color: #e94560; font-size: 1.5em; }
+  .status { background: #16213e; padding: 15px; border-radius: 10px; margin: 10px 0; }
+  .active { border-left: 3px solid #0f3460; }
+  p { line-height: 1.6; }
+</style>
+</head><body>
+<h1>WeaveLogic AI</h1>
+<div class="status active">
+  <p><strong>Status:</strong> Connected</p>
+  <p><strong>Model:</strong> Google Gemini 2.0 Flash</p>
+  <p><strong>Provider:</strong> OpenRouter</p>
+</div>
+<div class="status">
+  <p><strong>Voice Commands:</strong> Speak naturally — your voice is transcribed and sent to the AI.</p>
+  <p><strong>Camera:</strong> Long-press the button to capture and analyze what you see.</p>
+  <p><strong>Short Press:</strong> Activates listening mode.</p>
+</div>
+</body></html>`);
+  });
+
   await server.start();
   console.log(`[mentra-bridge] AppServer running on port ${MENTRA_PORT}`);
   console.log(`[mentra-bridge] Package: ${PACKAGE_NAME}`);
