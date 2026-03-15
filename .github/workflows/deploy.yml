@@ -54,27 +54,6 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          node -e '
-            const s = {
-              ANTHROPIC_API_KEY: process.env.S_ANTHROPIC_API_KEY,
-              MOLTBOT_GATEWAY_TOKEN: process.env.S_MOLTBOT_GATEWAY_TOKEN,
-              CF_ACCESS_TEAM_DOMAIN: process.env.S_CF_ACCESS_TEAM_DOMAIN,
-              CF_ACCESS_AUD: process.env.S_CF_ACCESS_AUD,
-              R2_ACCESS_KEY_ID: process.env.S_R2_ACCESS_KEY_ID,
-              R2_SECRET_ACCESS_KEY: process.env.S_R2_SECRET_ACCESS_KEY,
-              CF_ACCOUNT_ID: process.env.S_CF_ACCOUNT_ID,
-              MENTRA_API_KEY: process.env.S_MENTRA_API_KEY,
-              WORKER_URL: process.env.S_WORKER_URL,
-              AI_GATEWAY_API_KEY: process.env.S_AI_GATEWAY_API_KEY,
-              AI_GATEWAY_BASE_URL: process.env.S_AI_GATEWAY_BASE_URL,
-              AI_GATEWAY_MODEL: process.env.S_AI_GATEWAY_MODEL,
-            };
-            const filtered = {};
-            for (const [k, v] of Object.entries(s)) { if (v) filtered[k] = v; }
-            process.stdout.write(JSON.stringify(filtered));
-          ' | npx wrangler secret bulk
-        env:
           S_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           S_MOLTBOT_GATEWAY_TOKEN: ${{ secrets.MOLTBOT_GATEWAY_TOKEN }}
           S_CF_ACCESS_TEAM_DOMAIN: ${{ secrets.CF_ACCESS_TEAM_DOMAIN }}
@@ -87,6 +66,15 @@ jobs:
           S_AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
           S_AI_GATEWAY_BASE_URL: ${{ secrets.AI_GATEWAY_BASE_URL }}
           S_AI_GATEWAY_MODEL: ${{ secrets.AI_GATEWAY_MODEL }}
+        run: |
+          node -e '
+            const keys = ["ANTHROPIC_API_KEY","MOLTBOT_GATEWAY_TOKEN","CF_ACCESS_TEAM_DOMAIN",
+              "CF_ACCESS_AUD","R2_ACCESS_KEY_ID","R2_SECRET_ACCESS_KEY","CF_ACCOUNT_ID",
+              "MENTRA_API_KEY","WORKER_URL","AI_GATEWAY_API_KEY","AI_GATEWAY_BASE_URL","AI_GATEWAY_MODEL"];
+            const out = {};
+            for (const k of keys) { const v = process.env["S_" + k]; if (v) out[k] = v; }
+            process.stdout.write(JSON.stringify(out));
+          ' | npx wrangler secret bulk
 
   preview:
     if: github.event_name == 'pull_request'
