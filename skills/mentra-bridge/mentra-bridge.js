@@ -12,7 +12,8 @@
 
 const { AppServer } = require('@mentra/sdk');
 
-const OPENCLAW_PORT = process.env.OPENCLAW_PORT || 18789;
+// OpenClaw can be on localhost (same container) or via Worker URL (separate container)
+const OPENCLAW_URL = process.env.OPENCLAW_URL || `http://localhost:${process.env.OPENCLAW_PORT || 18789}`;
 const OPENCLAW_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || '';
 const MENTRA_PORT = parseInt(process.env.MENTRA_BRIDGE_PORT || '7010', 10);
 const PACKAGE_NAME = process.env.MENTRA_PACKAGE_NAME || 'mentra-claw';
@@ -73,7 +74,7 @@ async function queryOpenClaw(message, options = {}) {
   const timeout = setTimeout(() => controller.abort(), 30000);
 
   try {
-    const res = await fetch(`http://localhost:${OPENCLAW_PORT}/v1/chat/completions`, {
+    const res = await fetch(`${OPENCLAW_URL}/v1/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -290,20 +291,9 @@ class OpenClawBridge extends AppServer {
 // ============================================================
 
 async function main() {
-  // Wait for OpenClaw gateway to be ready
-  console.log(`[mentra-bridge] Waiting for OpenClaw gateway on port ${OPENCLAW_PORT}...`);
-  for (let i = 0; i < 60; i++) {
-    try {
-      const res = await fetch(`http://localhost:${OPENCLAW_PORT}/`, { method: 'HEAD' });
-      if (res.ok || res.status === 426) {
-        console.log(`[mentra-bridge] OpenClaw gateway is ready`);
-        break;
-      }
-    } catch (e) {
-      // Not ready yet
-    }
-    await new Promise((r) => setTimeout(r, 5000));
-  }
+  // Wait briefly then start (OpenClaw may be in a separate container)
+  console.log(`[mentra-bridge] OpenClaw URL: ${OPENCLAW_URL}`);
+  console.log(`[mentra-bridge] Starting bridge...`);
 
   const server = new OpenClawBridge();
 

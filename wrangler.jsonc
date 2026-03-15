@@ -32,12 +32,18 @@
   "build": {
     "command": "npm run build",
   },
-  // Container configuration for the Moltbot sandbox
+  // Container configuration
   "containers": [
     {
       "class_name": "Sandbox",
       "image": "./Dockerfile",
       "instance_type": "standard-1",
+      "max_instances": 1,
+    },
+    {
+      "class_name": "MentraBridge",
+      "image": "./Dockerfile.mentra",
+      "instance_type": "lite",
       "max_instances": 1,
     },
   ],
@@ -46,6 +52,10 @@
       {
         "class_name": "Sandbox",
         "name": "Sandbox",
+      },
+      {
+        "class_name": "MentraBridge",
+        "name": "MentraBridge",
       },
     ],
   },
@@ -69,6 +79,10 @@
     {
       "new_sqlite_classes": ["Sandbox"],
       "tag": "v5",
+    },
+    {
+      "new_sqlite_classes": ["MentraBridge"],
+      "tag": "v6",
     },
   ],
   // R2 bucket for persistent storage (moltbot data, conversations, etc.)

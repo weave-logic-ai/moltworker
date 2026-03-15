@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { getContainer } from '@cloudflare/containers';
 import type { AppEnv } from '../types';
 import { formatForGlasses } from '../mentra/display-format';
 import { MOLTBOT_PORT } from '../config';
@@ -102,13 +103,14 @@ mentraRoutes.post('/webhook', async (c) => {
 
   // Try forwarding to the MentraOS AppServer bridge on port 7010
   try {
-    const bridgeResp = await sandbox.containerFetch(
-      new Request(`http://localhost:${MENTRA_BRIDGE_PORT}/webhook`, {
+    // Route to MentraBridge container (separate from Sandbox)
+    const bridgeStub = c.env.MentraBridge.get(c.env.MentraBridge.idFromName('mentra-bridge'));
+    const bridgeResp = await bridgeStub.fetch(
+      new Request(`http://mentra-bridge/webhook`, {
         method: 'POST',
         headers: c.req.raw.headers,
         body: c.req.raw.body,
       }),
-      MENTRA_BRIDGE_PORT,
     );
 
     if (bridgeResp.ok) {
@@ -197,17 +199,16 @@ mentraRoutes.all('/*', async (c) => {
   const sandbox = c.get('sandbox');
 
   try {
-    await ensureMoltbotGateway(sandbox, c.env);
     const url = new URL(c.req.url);
     const path = url.pathname.replace('/mentra', '') || '/';
 
-    const bridgeResp = await sandbox.containerFetch(
-      new Request(`http://localhost:${MENTRA_BRIDGE_PORT}${path}${url.search}`, {
+    const bridgeStub = c.env.MentraBridge.get(c.env.MentraBridge.idFromName('mentra-bridge'));
+    const bridgeResp = await bridgeStub.fetch(
+      new Request(`http://mentra-bridge${path}${url.search}`, {
         method: c.req.method,
         headers: c.req.raw.headers,
         body: c.req.method !== 'GET' && c.req.method !== 'HEAD' ? c.req.raw.body : undefined,
       }),
-      MENTRA_BRIDGE_PORT,
     );
 
     return new Response(bridgeResp.body, {

@@ -145,12 +145,12 @@ describe('buildEnvVars', () => {
   });
 
   // Legacy AI Gateway model override
-  it('passes AI_GATEWAY_MODEL to container', () => {
+  it('does not pass AI_GATEWAY_MODEL to container (managed via R2 config)', () => {
     const env = createMockEnv({
       AI_GATEWAY_MODEL: 'anthropic/claude-sonnet-4-5',
     });
     const result = buildEnvVars(env);
-    expect(result.AI_GATEWAY_MODEL).toBe('anthropic/claude-sonnet-4-5');
+    expect(result.AI_GATEWAY_MODEL).toBeUndefined();
   });
 
   it('combines all env vars correctly', () => {

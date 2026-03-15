@@ -8,6 +8,7 @@ import type { MoltbotEnv } from './types';
 export function createMockEnv(overrides: Partial<MoltbotEnv> = {}): MoltbotEnv {
   return {
     Sandbox: {} as any,
+    MentraBridge: {} as any,
     ASSETS: {} as any,
     MOLTBOT_BUCKET: {} as any,
     ...overrides,
