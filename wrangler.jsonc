@@ -55,8 +55,12 @@
       "tag": "v1",
     },
     {
-      "new_sqlite_classes": ["Sandbox"],
+      "deleted_classes": ["Sandbox"],
       "tag": "v2",
+    },
+    {
+      "new_sqlite_classes": ["Sandbox"],
+      "tag": "v3",
     },
   ],
   // R2 bucket for persistent storage (moltbot data, conversations, etc.)
