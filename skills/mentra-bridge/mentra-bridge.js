@@ -117,49 +117,81 @@ class OpenClawBridge extends AppServer {
   }
 
   async onSession(session, sessionId, userId) {
-    console.log(`[mentra-bridge] Session started: ${sessionId} (user: ${userId})`);
+    console.log(`[mentra-bridge] ========================================`);
+    console.log(`[mentra-bridge] SESSION STARTED: ${sessionId}`);
+    console.log(`[mentra-bridge] User: ${userId}`);
     console.log(`[mentra-bridge] Capabilities:`, JSON.stringify(session.capabilities || {}));
+    console.log(`[mentra-bridge] Has layouts:`, !!session.layouts);
+    console.log(`[mentra-bridge] Has audio:`, !!session.audio);
+    console.log(`[mentra-bridge] Has camera:`, !!session.camera);
+    console.log(`[mentra-bridge] Has events:`, !!session.events);
+    console.log(`[mentra-bridge] Has location:`, !!session.location);
+    console.log(`[mentra-bridge] Has dashboard:`, !!session.dashboard);
+    console.log(`[mentra-bridge] Has settings:`, !!session.settings);
+    console.log(`[mentra-bridge] isConnected:`, session.isConnected);
+    console.log(`[mentra-bridge] ========================================`);
 
-    const hasDisplay = session.capabilities?.hasDisplay !== false && session.layouts;
-    const hasAudio = session.capabilities?.hasSpeaker !== false;
+    const hasDisplay = session.capabilities?.hasDisplay !== false && !!session.layouts;
+    const hasAudio = session.capabilities?.hasSpeaker !== false && !!session.audio;
+
+    console.log(`[mentra-bridge] Mode: ${hasDisplay ? 'display+audio' : hasAudio ? 'audio-only' : 'no-output'}`);
 
     // Helper: show on display if available, speak if audio available
     const showText = async (text) => {
       if (hasDisplay) {
-        try { await session.layouts.showTextWall(text); } catch (e) { /* no display */ }
+        try { await session.layouts.showTextWall(text); } catch (e) { console.log('[mentra-bridge] showTextWall error:', e.message); }
       }
     };
     const speakText = async (text) => {
-      if (hasAudio && session.audio) {
-        try { await session.audio.speak(text); } catch (e) { console.error('[mentra-bridge] TTS error:', e.message); }
+      if (hasAudio) {
+        console.log(`[mentra-bridge] Speaking: "${text.substring(0, 80)}..."`);
+        try { await session.audio.speak(text); console.log('[mentra-bridge] speak() returned OK'); } catch (e) { console.error('[mentra-bridge] TTS error:', e.message); }
+      } else {
+        console.log(`[mentra-bridge] No audio available, cannot speak`);
       }
     };
 
     // Ready message
+    console.log('[mentra-bridge] Sending ready message...');
     if (hasDisplay) await showText('WeaveLogic AI\nReady');
     if (hasAudio) await speakText('Ready');
+    console.log('[mentra-bridge] Ready message sent');
 
     // ── Transcription (voice → AI → audio response) ──────────────────
+    console.log('[mentra-bridge] Registering onTranscription handler...');
     session.events.onTranscription(async (data) => {
-      if (!data.isFinal) return;
+      console.log(`[mentra-bridge] >>> TRANSCRIPTION EVENT <<<`);
+      console.log(`[mentra-bridge]   text: "${data.text}"`);
+      console.log(`[mentra-bridge]   isFinal: ${data.isFinal}`);
+      console.log(`[mentra-bridge]   lang: ${data.transcribeLanguage}`);
+      console.log(`[mentra-bridge]   confidence: ${data.confidence}`);
 
-      console.log(`[mentra-bridge] Transcription: "${data.text}" (lang: ${data.transcribeLanguage}, confidence: ${data.confidence})`);
+      if (!data.isFinal) {
+        console.log('[mentra-bridge]   (interim, skipping)');
+        return;
+      }
+
+      console.log('[mentra-bridge] Processing final transcription...');
       await showText('Thinking...');
 
       try {
+        console.log(`[mentra-bridge] Calling OpenClaw: "${data.text}"`);
         const response = await queryOpenClaw(data.text);
+        console.log(`[mentra-bridge] OpenClaw response: "${response.substring(0, 200)}"`);
         await showText(formatForGlasses(response));
         await speakText(response);
       } catch (err) {
         console.error('[mentra-bridge] Transcription query failed:', err.message);
-        await showText('Sorry, try again.');
         await speakText('Sorry, something went wrong. Please try again.');
       }
     });
+    console.log('[mentra-bridge] onTranscription registered');
 
     // ── Photo (camera → AI vision → audio) ──────────────────
+    console.log('[mentra-bridge] Registering onPhotoTaken handler...');
     session.events.onPhotoTaken(async (data) => {
-      console.log(`[mentra-bridge] Photo received: ${data.mimeType}, ${data.photoData.byteLength} bytes`);
+      console.log(`[mentra-bridge] >>> PHOTO EVENT <<<`);
+      console.log(`[mentra-bridge]   mimeType: ${data.mimeType}, size: ${data.photoData?.byteLength || 0} bytes`);
       await showText('Analyzing...');
       await speakText('Analyzing photo');
 
@@ -176,8 +208,9 @@ class OpenClawBridge extends AppServer {
     });
 
     // ── Button press ──────────────────────────────────────────
+    console.log('[mentra-bridge] Registering onButtonPress handler...');
     session.events.onButtonPress(async (data) => {
-      console.log(`[mentra-bridge] Button: ${data.buttonId} ${data.pressType}`);
+      console.log(`[mentra-bridge] >>> BUTTON EVENT <<< id=${data.buttonId} type=${data.pressType}`);
 
       if (data.pressType === 'long') {
         await speakText('Capturing');
@@ -198,8 +231,9 @@ class OpenClawBridge extends AppServer {
     });
 
     // ── Head position ─────────────────────────────────────────
+    console.log('[mentra-bridge] Registering onHeadPosition handler...');
     session.events.onHeadPosition(async (data) => {
-      console.log(`[mentra-bridge] Head position: ${data.position}`);
+      console.log(`[mentra-bridge] >>> HEAD POSITION <<< ${data.position}`);
       // Could trigger actions based on head up/down
     });
 
@@ -261,7 +295,19 @@ class OpenClawBridge extends AppServer {
       // Dashboard may not be supported on all devices
     }
 
-    console.log(`[mentra-bridge] All event handlers registered for ${sessionId}`);
+    console.log(`[mentra-bridge] ========================================`);
+    console.log(`[mentra-bridge] ALL HANDLERS REGISTERED for ${sessionId}`);
+    console.log(`[mentra-bridge]   onTranscription: YES`);
+    console.log(`[mentra-bridge]   onPhotoTaken: YES`);
+    console.log(`[mentra-bridge]   onButtonPress: YES`);
+    console.log(`[mentra-bridge]   onHeadPosition: YES`);
+    console.log(`[mentra-bridge]   onPhoneNotifications: YES`);
+    console.log(`[mentra-bridge]   onGlassesBattery: YES`);
+    console.log(`[mentra-bridge]   onDisconnected: YES`);
+    console.log(`[mentra-bridge]   onReconnected: YES`);
+    console.log(`[mentra-bridge]   onError: YES`);
+    console.log(`[mentra-bridge] Waiting for events from glasses...`);
+    console.log(`[mentra-bridge] ========================================`);
   }
 
   // ── Tool calls (AI-triggered actions) ────────────────────────
