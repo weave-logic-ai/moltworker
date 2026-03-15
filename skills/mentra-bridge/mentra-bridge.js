@@ -117,39 +117,60 @@ class OpenClawBridge extends AppServer {
 
   async onSession(session, sessionId, userId) {
     console.log(`[mentra-bridge] Session started: ${sessionId} (user: ${userId})`);
+    console.log(`[mentra-bridge] Capabilities:`, JSON.stringify(session.capabilities || {}));
 
-    // Show ready message
-    await session.layouts.showTextWall('WeaveLogic AI\nReady').catch(console.error);
+    const hasDisplay = session.capabilities?.hasDisplay !== false && session.layouts;
+    const hasAudio = session.capabilities?.hasSpeaker !== false;
 
-    // ── Transcription (voice → AI → display) ──────────────────
+    // Helper: show on display if available, speak if audio available
+    const showText = async (text) => {
+      if (hasDisplay) {
+        try { await session.layouts.showTextWall(text); } catch (e) { /* no display */ }
+      }
+    };
+    const speakText = async (text) => {
+      if (hasAudio && session.audio) {
+        try { await session.audio.speak(text); } catch (e) { console.error('[mentra-bridge] TTS error:', e.message); }
+      }
+    };
+
+    // Ready message
+    if (hasDisplay) await showText('WeaveLogic AI\nReady');
+    if (hasAudio) await speakText('Ready');
+
+    // ── Transcription (voice → AI → audio response) ──────────────────
     session.events.onTranscription(async (data) => {
       if (!data.isFinal) return;
 
       console.log(`[mentra-bridge] Transcription: "${data.text}" (lang: ${data.transcribeLanguage}, confidence: ${data.confidence})`);
-      await session.layouts.showTextWall('Thinking...').catch(console.error);
+      await showText('Thinking...');
 
       try {
         const response = await queryOpenClaw(data.text);
-        await session.layouts.showTextWall(formatForGlasses(response));
+        await showText(formatForGlasses(response));
+        await speakText(response);
       } catch (err) {
         console.error('[mentra-bridge] Transcription query failed:', err.message);
-        await session.layouts.showTextWall('Sorry, something went wrong.\nPlease try again.').catch(console.error);
+        await showText('Sorry, try again.');
+        await speakText('Sorry, something went wrong. Please try again.');
       }
     });
 
-    // ── Photo (camera → AI vision → display) ──────────────────
+    // ── Photo (camera → AI vision → audio) ──────────────────
     session.events.onPhotoTaken(async (data) => {
       console.log(`[mentra-bridge] Photo received: ${data.mimeType}, ${data.photoData.byteLength} bytes`);
-      await session.layouts.showTextWall('Analyzing...').catch(console.error);
+      await showText('Analyzing...');
+      await speakText('Analyzing photo');
 
       try {
         const base64 = arrayBufferToBase64(data.photoData);
         const model = VISION_MODEL || undefined;
         const response = await queryOpenClaw('What do you see? Be concise.', { imageBase64: base64, model });
-        await session.layouts.showTextWall(formatForGlasses(response));
+        await showText(formatForGlasses(response));
+        await speakText(response);
       } catch (err) {
         console.error('[mentra-bridge] Photo query failed:', err.message);
-        await session.layouts.showTextWall('Could not analyze image.\nPlease try again.').catch(console.error);
+        await speakText('Could not analyze image. Please try again.');
       }
     });
 
@@ -158,21 +179,20 @@ class OpenClawBridge extends AppServer {
       console.log(`[mentra-bridge] Button: ${data.buttonId} ${data.pressType}`);
 
       if (data.pressType === 'long') {
-        // Long press: take a photo and analyze
-        await session.layouts.showTextWall('Capturing...').catch(console.error);
+        await speakText('Capturing');
         try {
           const photo = await session.camera.requestPhoto({ purpose: 'AI analysis' });
           const base64 = arrayBufferToBase64(photo.photoData);
           const model = VISION_MODEL || undefined;
           const response = await queryOpenClaw('What do you see? Describe briefly.', { imageBase64: base64, model });
-          await session.layouts.showTextWall(formatForGlasses(response));
+          await showText(formatForGlasses(response));
+          await speakText(response);
         } catch (err) {
           console.error('[mentra-bridge] Photo capture failed:', err.message);
-          await session.layouts.showTextWall('Could not capture photo.').catch(console.error);
+          await speakText('Could not capture photo.');
         }
       } else {
-        // Short press: show listening indicator
-        await session.layouts.showTextWall('Listening...').catch(console.error);
+        await speakText('Listening');
       }
     });
 
@@ -189,13 +209,9 @@ class OpenClawBridge extends AppServer {
       for (const notif of notifications) {
         console.log(`[mentra-bridge] Notification: [${notif.app}] ${notif.title}`);
 
-        // Show high-priority notifications on the HUD
         if (notif.priority === 'high') {
-          const display = `${notif.app}\n${notif.title}\n${notif.content || ''}`;
-          await session.layouts.showReferenceCard({
-            title: notif.app,
-            text: notif.content || notif.title,
-          }).catch(console.error);
+          await showText(`${notif.app}: ${notif.title}`);
+          await speakText(`${notif.app}: ${notif.title}`);
         }
       }
     });
@@ -204,7 +220,7 @@ class OpenClawBridge extends AppServer {
     session.events.onGlassesBattery(async (data) => {
       if (data.batteryLevel !== undefined && data.batteryLevel <= 10) {
         console.log(`[mentra-bridge] Low battery: ${data.batteryLevel}%`);
-        await session.layouts.showTextWall(`Low battery: ${data.batteryLevel}%`).catch(console.error);
+        await speakText(`Low battery: ${data.batteryLevel} percent`);
       }
     });
 
@@ -228,7 +244,7 @@ class OpenClawBridge extends AppServer {
 
     session.events.onReconnected(() => {
       console.log(`[mentra-bridge] Session reconnected: ${sessionId}`);
-      session.layouts.showTextWall('Reconnected').catch(console.error);
+      speakText('Reconnected').catch(console.error);
     });
 
     session.events.onError((error) => {
@@ -237,12 +253,11 @@ class OpenClawBridge extends AppServer {
 
     // ── Dashboard ─────────────────────────────────────────────
     try {
-      session.dashboard.write(
-        { text: 'WeaveLogic AI - Active' },
-        { targets: ['dashboard'] },
-      );
+      if (session.dashboard && session.dashboard.content) {
+        session.dashboard.content.writeToMain('WeaveLogic AI - Active');
+      }
     } catch (e) {
-      // Dashboard write may not be supported on all devices
+      // Dashboard may not be supported on all devices
     }
 
     console.log(`[mentra-bridge] All event handlers registered for ${sessionId}`);
