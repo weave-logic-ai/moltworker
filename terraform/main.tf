@@ -8,10 +8,6 @@ terraform {
       source  = "hashicorp/google"
       version = "~> 5.0"
     }
-    cloudflare = {
-      source  = "cloudflare/cloudflare"
-      version = "~> 5.0"
-    }
   }
 
   # State stored in GCS bucket for team access and locking
@@ -25,8 +21,4 @@ provider "google" {
   project = var.gcp_project_id
   region  = var.gcp_region
   zone    = var.gcp_zone
-}
-
-provider "cloudflare" {
-  api_token = var.cloudflare_api_token
 }

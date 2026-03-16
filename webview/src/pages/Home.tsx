@@ -1,12 +1,29 @@
 /**
- * Home screen — displayed when no workflow is active.
+ * Home screen -- displayed when no workflow is active.
  *
  * Content varies by active tab:
- *   Tab 0 (Chat):     Greeting, recent workflows, quick actions, notifications
+ *   Tab 0 (Chat):     Greeting, agent status, quick actions, recent workflows,
+ *                      notifications with priority coloring
  *   Tab 1 (Comms):    Communication officer placeholder
  *   Tab 2 (Admin):    Server management placeholder
  *   Tab 3 (Settings): Global settings placeholder
  */
+
+import { navigate, workflowPath } from '@/lib/router';
+import { enterWorkflow, closeAllOverlays } from '@/store/app-state';
+import type { Workflow } from '@/types';
+
+// ---------------------------------------------------------------------------
+// Shared sample data (same as LeftDrawer)
+// ---------------------------------------------------------------------------
+
+const SAMPLE_WORKFLOWS: Workflow[] = [
+  { id: 'wf-1', projectId: 'proj-1', name: 'Auth Service Refactor', status: 'active', messageCount: 42, lastActivity: '2m ago' },
+  { id: 'wf-2', projectId: 'proj-1', name: 'Container Deploy Pipeline', status: 'active', messageCount: 28, lastActivity: '8m ago' },
+  { id: 'wf-3', projectId: 'proj-1', name: 'API Gateway Rate Limiting', status: 'paused', messageCount: 15, lastActivity: '22m ago' },
+  { id: 'wf-4', projectId: 'proj-2', name: 'Edge CDN Configuration', status: 'active', messageCount: 67, lastActivity: '1h ago' },
+  { id: 'wf-5', projectId: 'proj-2', name: 'DNS Migration', status: 'completed', messageCount: 89, lastActivity: '2d ago' },
+];
 
 interface HomeProps {
   activeTab: number;
@@ -27,6 +44,12 @@ export function Home({ activeTab }: HomeProps) {
 // ---------------------------------------------------------------------------
 
 function HomeChat() {
+  const handleWorkflowClick = (wf: Workflow) => {
+    enterWorkflow(wf);
+    navigate(workflowPath(wf.id));
+    closeAllOverlays();
+  };
+
   return (
     <div className="content-padding">
       {/* Greeting */}
@@ -58,13 +81,14 @@ function HomeChat() {
         }}>
           OC
         </div>
-        <div>
+        <div style={{ flex: 1 }}>
           <div className="text-body" style={{ fontWeight: 500 }}>OpenClaw Agent</div>
           <div className="text-secondary">Idle</div>
         </div>
+        <span className="status-dot status-dot--success" style={{ marginRight: '4px' }} />
       </div>
 
-      {/* Quick actions */}
+      {/* Quick actions -- horizontal scrollable pills */}
       <div className="section-gap-lg">
         <div className="text-section-label" style={{ marginBottom: '10px' }}>Quick Actions</div>
         <div style={{
@@ -73,26 +97,33 @@ function HomeChat() {
           overflowX: 'auto',
           WebkitOverflowScrolling: 'touch',
           paddingBottom: '4px',
+          scrollbarWidth: 'none',
         }}>
           <button className="pill">+ New Workflow</button>
           <button className="pill">Resume Last</button>
           <button className="pill">View Notifications</button>
+          <button className="pill">Run Diagnostics</button>
         </div>
       </div>
 
-      {/* Recent workflows */}
+      {/* Recent workflows -- using shared sample data */}
       <div className="section-gap-lg">
         <div className="text-section-label" style={{ marginBottom: '10px' }}>Recent Workflows</div>
-        <WorkflowListItem name="Deploy Fix #37" status="active" time="2m ago" messages={42} />
-        <WorkflowListItem name="Auth Refactor" status="paused" time="1h ago" messages={128} />
-        <WorkflowListItem name="CI/CD Setup" status="completed" time="3h ago" messages={67} />
+        {SAMPLE_WORKFLOWS.map((wf) => (
+          <WorkflowListItem
+            key={wf.id}
+            workflow={wf}
+            onClick={() => handleWorkflowClick(wf)}
+          />
+        ))}
       </div>
 
       {/* Notifications */}
       <div className="section-gap-lg" style={{ paddingBottom: '32px' }}>
         <div className="text-section-label" style={{ marginBottom: '10px' }}>Notifications</div>
-        <NotificationItem priority="warning" title="Build failed on staging" time="5m ago" />
-        <NotificationItem priority="info" title="PR #45 merged" time="12m ago" />
+        <NotificationItem priority="critical" title="Health check failed on staging" time="2m ago" />
+        <NotificationItem priority="warning" title="Memory GC threshold reached (90%)" time="5m ago" />
+        <NotificationItem priority="info" title="PR #45 merged successfully" time="12m ago" />
         <NotificationItem priority="success" title="Deploy to production succeeded" time="1h ago" />
       </div>
     </div>
@@ -185,11 +216,9 @@ function HomeSettings() {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function WorkflowListItem({ name, status, time, messages }: {
-  name: string;
-  status: 'active' | 'paused' | 'completed' | 'error';
-  time: string;
-  messages: number;
+function WorkflowListItem({ workflow, onClick }: {
+  workflow: Workflow;
+  onClick: () => void;
 }) {
   const statusColor: Record<string, string> = {
     active: 'var(--success)',
@@ -199,18 +228,23 @@ function WorkflowListItem({ name, status, time, messages }: {
   };
 
   return (
-    <div className="ghost-border" style={{
-      display: 'flex',
-      alignItems: 'center',
-      padding: '12px 0',
-      cursor: 'pointer',
-    }}>
-      <span className="status-dot" style={{ background: statusColor[status], marginRight: '10px' }} />
+    <div
+      className="ghost-border"
+      onClick={onClick}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        padding: '12px 0',
+        cursor: 'pointer',
+        transition: 'background 150ms ease',
+      }}
+    >
+      <span className="status-dot" style={{ background: statusColor[workflow.status], marginRight: '10px' }} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div className="text-body" style={{ fontWeight: 500 }}>{name}</div>
-        <div className="text-meta">{messages} messages</div>
+        <div className="text-body" style={{ fontWeight: 500 }}>{workflow.name}</div>
+        <div className="text-meta">{workflow.messageCount} messages</div>
       </div>
-      <span className="text-meta">{time}</span>
+      <span className="text-meta">{workflow.lastActivity}</span>
     </div>
   );
 }

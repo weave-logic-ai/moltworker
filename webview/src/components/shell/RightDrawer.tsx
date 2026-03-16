@@ -1,173 +1,251 @@
 /**
- * RightDrawer — Debug tools drawer.
+ * RightDrawer -- Mentra Live sensor debug drawer.
  *
- * Structure-only scaffold. Slides in from the right edge.
- * Contains collapsible sections for each Mentra Live sensor:
+ * 8 collapsible sections for each sensor type:
  * Microphone, Camera, Button, Speaker, Battery, WiFi, Location, IMU.
+ *
+ * Each section displays label:value monospace pairs with placeholder data.
+ * Slide-in animation from right.
  */
 
+import { useState } from 'react';
 import { closeAllOverlays } from '@/store/app-state';
+import { renderSensorContent } from './SensorPanels';
+import type { SensorContent } from './SensorPanels';
+
+// ---------------------------------------------------------------------------
+// Sensor Section Definition & Sample Data
+// ---------------------------------------------------------------------------
 
 interface SensorSection {
+  id: string;
   name: string;
   status: 'connected' | 'disconnected' | 'idle';
-  items: Array<{ label: string; value: string }>;
+  content: SensorContent;
 }
 
 const SENSOR_SECTIONS: SensorSection[] = [
   {
+    id: 'mic',
     name: 'Microphone',
-    status: 'idle',
-    items: [
-      { label: 'Transcription', value: 'Idle' },
-      { label: 'Language', value: 'en-US' },
-      { label: 'VAD', value: 'Off' },
-    ],
+    status: 'connected',
+    content: {
+      type: 'microphone',
+      transcription: 'Show me the deploy status for the auth service...',
+      audioLevel: 65,
+      vadStatus: 'Active',
+      language: 'en-US',
+    },
   },
   {
+    id: 'camera',
     name: 'Camera',
     status: 'idle',
-    items: [
-      { label: 'Last capture', value: '--' },
-      { label: 'Stream', value: 'Off' },
-      { label: 'Resolution', value: '--' },
-    ],
+    content: {
+      type: 'camera',
+      lastPhoto: null,
+      resolution: '1280x720',
+      streamStatus: 'Off',
+    },
   },
   {
+    id: 'button',
     name: 'Button',
-    status: 'idle',
-    items: [
-      { label: 'Last press', value: '--' },
-      { label: 'Type', value: '--' },
-    ],
+    status: 'connected',
+    content: {
+      type: 'button',
+      events: [
+        { time: '21:20:14', action: 'single press' },
+        { time: '21:18:45', action: 'long press' },
+        { time: '21:15:32', action: 'single press' },
+        { time: '21:12:01', action: 'double press' },
+        { time: '21:08:22', action: 'single press' },
+      ],
+    },
   },
   {
+    id: 'speaker',
     name: 'Speaker',
-    status: 'idle',
-    items: [
-      { label: 'TTS queue', value: '0' },
-      { label: 'Playing', value: 'No' },
-      { label: 'Volume', value: '--' },
-    ],
+    status: 'connected',
+    content: {
+      type: 'speaker',
+      ttsQueue: 2,
+      playbackStatus: 'Playing',
+      volume: 72,
+    },
   },
   {
+    id: 'battery',
     name: 'Battery',
-    status: 'idle',
-    items: [
-      { label: 'Glasses', value: '--%' },
-      { label: 'Case', value: '--%' },
-      { label: 'Charging', value: '--' },
-    ],
+    status: 'connected',
+    content: {
+      type: 'battery',
+      glassesPercent: 78,
+      casePercent: 94,
+      charging: false,
+    },
   },
   {
+    id: 'wifi',
     name: 'WiFi',
-    status: 'disconnected',
-    items: [
-      { label: 'SSID', value: '--' },
-      { label: 'Signal', value: '--' },
-    ],
+    status: 'connected',
+    content: {
+      type: 'wifi',
+      ssid: 'WeaveLogic-5G',
+      signalBars: 3,
+      connectionStatus: 'Connected',
+    },
   },
   {
+    id: 'location',
     name: 'Location',
     status: 'idle',
-    items: [
-      { label: 'Lat/Lng', value: '--' },
-      { label: 'Accuracy', value: '--' },
-      { label: 'Updated', value: '--' },
-    ],
+    content: {
+      type: 'location',
+      lat: '37.7749',
+      lng: '-122.4194',
+      accuracy: '12m',
+      lastUpdate: '30s ago',
+    },
   },
   {
+    id: 'imu',
     name: 'IMU',
-    status: 'idle',
-    items: [
-      { label: 'Accel', value: '-- / -- / --' },
-      { label: 'Gyro', value: '-- / -- / --' },
-      { label: 'Head', value: '--' },
-    ],
+    status: 'connected',
+    content: {
+      type: 'imu',
+      accelX: '0.02',
+      accelY: '-0.98',
+      accelZ: '0.11',
+    },
   },
 ];
 
-const STATUS_DOT_CLASS: Record<string, string> = {
-  connected: 'status-dot--success',
-  disconnected: 'status-dot--error',
-  idle: 'status-dot--idle',
+// ---------------------------------------------------------------------------
+// Status dot color mapping
+// ---------------------------------------------------------------------------
+
+const STATUS_DOT_COLOR: Record<string, string> = {
+  connected: 'var(--success)',
+  disconnected: 'var(--destructive)',
+  idle: 'var(--text-subtle)',
 };
 
+// ---------------------------------------------------------------------------
+// Main Component
+// ---------------------------------------------------------------------------
+
 export function RightDrawer() {
+  const [openSections, setOpenSections] = useState<Set<string>>(
+    new Set(['mic', 'battery', 'wifi']),
+  );
+
+  const toggleSection = (id: string) => {
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   return (
     <aside style={{
       position: 'fixed',
       top: 0,
       left: '50%',
-      transform: 'translateX(-50%)',
-      width: '100%',
-      maxWidth: '428px',
+      transform: 'translateX(calc(-50% + 20%))',
+      width: '80%',
+      maxWidth: '342px',
       height: '100dvh',
       background: 'var(--bg-elevated)',
       zIndex: 50,
       display: 'flex',
       flexDirection: 'column',
       overflow: 'hidden',
+      animation: 'slideInRight 200ms ease',
     }}>
       {/* Header */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '14px 20px',
-        borderBottom: '1px solid var(--border)',
+        padding: '16px 20px 12px',
+        flexShrink: 0,
       }}>
-        <span className="text-section-title">Debug Tools</span>
+        <span style={{ fontSize: '16px', fontWeight: 600, letterSpacing: '-0.2px' }}>Debug</span>
         <button
           onClick={closeAllOverlays}
           style={{
             background: 'none',
             border: 'none',
-            color: 'var(--text-muted)',
-            fontSize: '18px',
+            color: 'var(--text-subtle)',
+            fontSize: '20px',
             cursor: 'pointer',
+            padding: '4px',
           }}
           aria-label="Close drawer"
         >
-          x
+          {'\u00D7'}
         </button>
       </div>
 
       {/* Sensor sections */}
-      <div style={{ flex: 1, overflow: 'auto' }}>
-        {SENSOR_SECTIONS.map((section) => (
-          <div key={section.name} style={{ borderBottom: '1px solid var(--border)' }}>
-            {/* Section header */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '12px 20px',
-              cursor: 'pointer',
-            }}>
-              <span className={`status-dot ${STATUS_DOT_CLASS[section.status]}`} />
-              <span className="text-section-label" style={{ flex: 1 }}>{section.name}</span>
-              <span style={{ color: 'var(--text-subtle)', fontSize: '12px' }}>v</span>
-            </div>
-
-            {/* Data pairs */}
-            <div style={{ padding: '0 20px 12px 36px' }}>
-              {section.items.map((item) => (
-                <div
-                  key={item.label}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    padding: '3px 0',
-                  }}
-                >
-                  <span className="text-meta">{item.label}</span>
-                  <span className="text-meta" style={{ color: 'var(--text)' }}>{item.value}</span>
+      <div style={{
+        flex: 1,
+        overflowY: 'auto',
+        padding: '0 0 20px',
+        WebkitOverflowScrolling: 'touch',
+      }}>
+        {SENSOR_SECTIONS.map((section) => {
+          const isOpen = openSections.has(section.id);
+          return (
+            <div key={section.id} style={{ borderBottom: '1px solid var(--border)' }}>
+              {/* Section header */}
+              <div
+                onClick={() => toggleSection(section.id)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '14px 20px',
+                  cursor: 'pointer',
+                  transition: 'background 150ms ease',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    background: STATUS_DOT_COLOR[section.status],
+                    flexShrink: 0,
+                  }} />
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    textTransform: 'uppercase' as const,
+                    letterSpacing: '0.8px',
+                    color: 'var(--text-muted)',
+                  }}>
+                    {section.name}
+                  </span>
                 </div>
-              ))}
+                <span style={{
+                  fontSize: '12px',
+                  color: 'var(--text-subtle)',
+                  transition: 'transform 200ms ease',
+                  transform: isOpen ? 'rotate(90deg)' : 'none',
+                }}>
+                  {'\u203A'}
+                </span>
+              </div>
+
+              {/* Section body */}
+              {isOpen && renderSensorContent(section.content)}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </aside>
   );

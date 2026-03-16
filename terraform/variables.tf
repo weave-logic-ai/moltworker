@@ -26,46 +26,18 @@ variable "gcp_machine_type" {
   default     = "e2-medium"
 }
 
-# --- Cloudflare ---
-
-variable "cloudflare_api_token" {
-  description = "Cloudflare API token"
-  type        = string
-  sensitive   = true
-}
-
-variable "cloudflare_account_id" {
-  description = "Cloudflare account ID"
-  type        = string
-}
-
-variable "cloudflare_zone_id" {
-  description = "Cloudflare zone ID for domain"
-  type        = string
-}
+# --- Networking ---
 
 variable "domain" {
-  description = "Base domain for services (e.g., example.com)"
+  description = "Base domain for services (e.g., pod.aebots.com)"
   type        = string
+  default     = "pod.aebots.com"
 }
-
-variable "tunnel_secret" {
-  description = "Cloudflare Tunnel secret (base64-encoded, 32+ bytes)"
-  type        = string
-  sensitive   = true
-}
-
-# --- Access Control ---
 
 variable "ssh_allowed_ips" {
   description = "IPs allowed to SSH into the VM"
   type        = list(string)
   default     = ["0.0.0.0/0"] # Restrict in production
-}
-
-variable "allowed_emails" {
-  description = "Emails allowed via Cloudflare Access"
-  type        = list(string)
 }
 
 # --- Secrets ---

@@ -208,6 +208,16 @@ body {
   50% { opacity: 0.5; }
 }
 
+@keyframes slideInLeft {
+  from { transform: translateX(calc(-50% - 40%)); }
+  to { transform: translateX(-50%); }
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(calc(-50% + 60%)); }
+  to { transform: translateX(calc(-50% + 20%)); }
+}
+
 .animate-thinking {
   animation: thinking 1.4s infinite ease-in-out;
 }
