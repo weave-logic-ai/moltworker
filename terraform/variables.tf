@@ -67,3 +67,19 @@ variable "allowed_emails" {
   description = "Emails allowed via Cloudflare Access"
   type        = list(string)
 }
+
+# --- Secrets ---
+
+variable "use_secret_manager" {
+  description = "Enable GCP Secret Manager for secrets (alternative to .env file)"
+  type        = bool
+  default     = false
+}
+
+# --- Monitoring ---
+
+variable "monitoring_email" {
+  description = "Email address for monitoring alert notifications"
+  type        = string
+  default     = ""
+}

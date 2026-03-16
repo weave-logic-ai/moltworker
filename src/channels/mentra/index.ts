@@ -1,26 +1,16 @@
 /**
- * MentraChannel — OpenClaw Channel Plugin for Mentra Live Smart Glasses
+ * MentraChannel -- OpenClaw Channel Plugin for Mentra Live Smart Glasses.
  *
- * Implements the OpenClaw channel interface using the @mentra/sdk AppServer pattern.
- * Bridges voice transcription, camera capture, button events, and other glasses
- * sensor data to the OpenClaw agent via /v1/chat/completions.
+ * Bridges voice transcription, camera capture, button events, and sensor data
+ * to the OpenClaw agent via /v1/chat/completions.
  *
- * Based on the working implementation in skills/mentra-bridge/mentra-bridge.js,
- * rewritten in TypeScript with proper types and lifecycle management.
- *
- * Usage:
- *   const channel = new MentraChannel(config, openclawConfig);
- *   await channel.init();
- *   await channel.start();
- *   // ... channel is now listening for glasses connections
- *   await channel.stop();
+ * Week 2: SessionState (context-aware responses), AudioPipeline (managed TTS),
+ * createMentraChannel() factory function.
  */
 
 import type {
   MentraChannelConfig,
   MentraSession,
-  MentraResponse,
-  SessionCapabilities,
   TranscriptionData,
   ButtonPressData,
   PhotoTakenData,
@@ -35,11 +25,13 @@ import type {
 } from './types';
 import {
   resolveConfig,
-  MAX_DISPLAY_CHARS,
+  configFromEnv,
   OPENCLAW_QUERY_TIMEOUT_MS,
   MAX_RESPONSE_TOKENS,
 } from './config';
-import { formatForGlasses } from '../../mentra/display-format';
+import { SessionState } from './session-state';
+import { AudioPipeline } from './audio-pipeline';
+import { detectCapabilities, createShowText, buildResponse, arrayBufferToBase64 } from './helpers';
 
 // ---------------------------------------------------------------------------
 // OpenClaw Gateway Config
@@ -54,29 +46,33 @@ export interface OpenClawGatewayConfig {
 }
 
 // ---------------------------------------------------------------------------
-// MentraChannel
+// Factory Function
 // ---------------------------------------------------------------------------
 
 /**
- * MentraChannel bridges Mentra Live smart glasses to the OpenClaw AI agent.
+ * Create a MentraChannel from environment variables.
  *
- * Lifecycle:
- *   1. constructor() — stores config
- *   2. init() — validates config, prepares resources
- *   3. start() — starts the AppServer, begins accepting connections
- *   4. stop() — shuts down the AppServer, cleans up
- *
- * The AppServer receives WebSocket connections from MentraOS Cloud.
- * Each connection creates a session with event handlers for:
- *   - Voice transcription (onTranscription)
- *   - Photo capture (onPhotoTaken)
- *   - Button press (onButtonPress)
- *   - Head tracking (onHeadPosition)
- *   - Phone notifications (onPhoneNotifications)
- *   - Battery status (onGlassesBattery)
- *   - Multi-user messaging (onAppMessage, onAppUserJoined, onAppUserLeft)
- *   - Lifecycle (onDisconnected, onReconnected, onError)
+ * Reads MENTRAOS_API_KEY, MENTRA_PACKAGE_NAME, MENTRA_BRIDGE_PORT, etc.
+ * from the provided env object, merges with defaults, and returns a
+ * ready-to-init MentraChannel instance.
  */
+export function createMentraChannel(
+  env: Record<string, string | undefined>,
+): MentraChannel {
+  const channelConfig = configFromEnv(env);
+  const openclawConfig: OpenClawGatewayConfig = {
+    url: env.OPENCLAW_URL || `http://localhost:${env.OPENCLAW_PORT || '18789'}`,
+    token: env.OPENCLAW_GATEWAY_TOKEN || '',
+  };
+
+  return new MentraChannel(channelConfig, openclawConfig);
+}
+
+// ---------------------------------------------------------------------------
+// MentraChannel
+// ---------------------------------------------------------------------------
+
+/** Bridges Mentra Live smart glasses to the OpenClaw AI agent. */
 export class MentraChannel {
   private config: MentraChannelConfig;
   private openclawConfig: OpenClawGatewayConfig;
@@ -147,19 +143,13 @@ export class MentraChannel {
 // MentraAppServer
 // ---------------------------------------------------------------------------
 
-/**
- * Internal AppServer implementation.
- * Subclasses @mentra/sdk AppServer and implements onSession + onToolCall.
- *
- * NOTE: In a real deployment, this would `extend AppServer` from '@mentra/sdk'.
- * Since @mentra/sdk is not available as a dev dependency in this project,
- * we define the interface and structure here for type safety. The actual
- * SDK import would replace the base class at build time.
- */
+/** Internal AppServer. In production, extends @mentra/sdk AppServer. */
 class MentraAppServer {
   private config: MentraChannelConfig;
   private openclawConfig: OpenClawGatewayConfig;
   private activeSessions: Map<string, MentraSession>;
+  private sessionStates: Map<string, SessionState> = new Map();
+  private audioPipelines: Map<string, AudioPipeline> = new Map();
   private started = false;
 
   constructor(
@@ -186,11 +176,13 @@ class MentraAppServer {
 
   async stop(): Promise<void> {
     this.started = false;
+    this.sessionStates.clear();
+    this.audioPipelines.clear();
     console.log('[mentra-server] AppServer stopped');
   }
 
   // -----------------------------------------------------------------------
-  // onSession — main session handler
+  // onSession -- main session handler
   // -----------------------------------------------------------------------
 
   /** Called by the SDK when a user opens the app on their glasses. */
@@ -202,73 +194,134 @@ class MentraAppServer {
     const caps = detectCapabilities(session);
     console.log(`[mentra-session] display=${caps.hasDisplay} speaker=${caps.hasSpeaker} camera=${caps.hasCamera}`);
 
-    // Create display/audio helpers
+    // Initialize per-session state and audio pipeline
+    const state = new SessionState(sessionId, userId, caps);
+    this.sessionStates.set(sessionId, state);
+
+    const audio = new AudioPipeline(session, caps.hasSpeaker);
+    this.audioPipelines.set(sessionId, audio);
+
+    // Create display helper
     const showText = createShowText(session, caps);
-    const speakText = createSpeakText(session, caps);
 
     // Send ready message
     await showText('WeaveLogic AI\nReady');
-    await speakText('Ready');
+    await audio.speak('Ready');
 
+    // Play connect sound
+    await audio.playSound('connect');
+
+    // -- Transcription (voice -> AI -> audio response) --------------------
     session.events.onTranscription(async (data: TranscriptionData) => {
       if (!data.isFinal) return;
 
-      await showText('Thinking...');
+      // Queue: prevent concurrent OpenClaw requests per session
+      if (!state.acquireProcessingLock()) {
+        console.log(`[mentra-session] Busy, queuing: "${data.text.substring(0, 40)}..."`);
+        return;
+      }
 
       try {
-        const response = await this.queryOpenClaw(data.text);
+        // Record user message
+        state.addMessage('user', data.text);
+
+        await showText('Thinking...');
+
+        const response = await this.queryOpenClaw(data.text, state);
         const formatted = buildResponse(response);
+
+        // Record assistant response
+        state.addMessage('assistant', response);
+
         await showText(formatted.displayText);
-        await speakText(formatted.audioText);
+        await audio.speak(formatted.audioText);
       } catch (err) {
         console.error('[mentra-session] Transcription query failed:', (err as Error).message);
-        await speakText('Sorry, something went wrong. Please try again.');
+        await audio.playSound('error');
+        await audio.speak('Sorry, something went wrong. Please try again.');
+      } finally {
+        state.releaseProcessingLock();
       }
     });
 
+    // -- Photo (camera -> AI vision -> audio) -----------------------------
     session.events.onPhotoTaken(async (data: PhotoTakenData) => {
-      await showText('Analyzing...');
-      await speakText('Analyzing photo');
+      if (!state.acquireProcessingLock()) return;
 
       try {
+        await showText('Analyzing...');
+        await audio.speak('Analyzing photo');
+
         const base64 = arrayBufferToBase64(data.photoData);
         const model = this.config.visionModel || undefined;
-        const response = await this.queryOpenClaw('What do you see? Be concise.', { imageBase64: base64, model });
+        const response = await this.queryOpenClaw('What do you see? Be concise.', state, {
+          imageBase64: base64,
+          model,
+        });
         const formatted = buildResponse(response);
+
+        state.addMessage('user', '[Photo taken] What do you see?');
+        state.addMessage('assistant', response);
+
         await showText(formatted.displayText);
-        await speakText(formatted.audioText);
+        await audio.speak(formatted.audioText);
       } catch (err) {
         console.error('[mentra-session] Photo query failed:', (err as Error).message);
-        await speakText('Could not analyze image. Please try again.');
+        await audio.playSound('error');
+        await audio.speak('Could not analyze image. Please try again.');
+      } finally {
+        state.releaseProcessingLock();
       }
     });
 
+    // -- Button press ------------------------------------------------------
     session.events.onButtonPress(async (data: ButtonPressData) => {
+      // Short press during audio -> interrupt (stop audio)
+      if (data.pressType === 'short' && audio.isPlaying) {
+        await audio.stopAudio();
+        return;
+      }
 
       if (data.pressType === 'long') {
-        await speakText('Capturing');
+        // Long press -> capture photo for AI analysis
+        await audio.speak('Capturing');
+
+        if (!state.acquireProcessingLock()) return;
+
         try {
           const photo = await session.camera.requestPhoto({ purpose: 'AI analysis' });
           const base64 = arrayBufferToBase64(photo.photoData);
           const model = this.config.visionModel || undefined;
-          const response = await this.queryOpenClaw('What do you see? Describe briefly.', {
+          const response = await this.queryOpenClaw('What do you see? Describe briefly.', state, {
             imageBase64: base64,
             model,
           });
           const formatted = buildResponse(response);
+
+          state.addMessage('user', '[Long press photo] What do you see?');
+          state.addMessage('assistant', response);
+
           await showText(formatted.displayText);
-          await speakText(formatted.audioText);
+          await audio.speak(formatted.audioText);
         } catch (err) {
           console.error('[mentra-session] Photo capture failed:', (err as Error).message);
-          await speakText('Could not capture photo.');
+          await audio.playSound('error');
+          await audio.speak('Could not capture photo.');
+        } finally {
+          state.releaseProcessingLock();
         }
       } else {
-        await speakText('Listening');
+        // Short press (not during audio) -> listening feedback
+        await audio.speak('Listening');
       }
     });
 
-    session.events.onHeadPosition(async (_data: HeadPositionData) => {});
+    // -- Head position ----------------------------------------------------
+    session.events.onHeadPosition(async (_data: HeadPositionData) => {
+      state.touch();
+    });
 
+    // -- Phone notifications ----------------------------------------------
     session.events.onPhoneNotifications(async (notifications: PhoneNotification[]) => {
       if (!notifications || notifications.length === 0) return;
 
@@ -276,38 +329,57 @@ class MentraAppServer {
         console.log(`[mentra-session] Notification: [${notif.app}] ${notif.title}`);
         if (notif.priority === 'high') {
           await showText(`${notif.app}: ${notif.title}`);
-          await speakText(`${notif.app}: ${notif.title}`);
+          await audio.playSound('notification');
+          await audio.speak(`${notif.app}: ${notif.title}`);
         }
       }
     });
 
+    // -- Battery status ---------------------------------------------------
     session.events.onGlassesBattery(async (data: BatteryData) => {
       if (data.batteryLevel !== undefined && data.batteryLevel <= 10) {
-        await speakText(`Low battery: ${data.batteryLevel} percent`);
+        await audio.speak(`Low battery: ${data.batteryLevel} percent`);
       }
     });
 
-    session.events.onAppMessage(async (_message: AppMessageData) => {});
+    // -- App-to-app messaging ---------------------------------------------
+    session.events.onAppMessage(async (_message: AppMessageData) => {
+      state.touch();
+    });
     session.events.onAppUserJoined(async (_userId: string) => {});
     session.events.onAppUserLeft(async (_userId: string) => {});
 
-    session.events.onDisconnected(() => { this.activeSessions.delete(sessionId); });
+    // -- Lifecycle events -------------------------------------------------
+    session.events.onDisconnected(() => {
+      this.activeSessions.delete(sessionId);
+      this.sessionStates.delete(sessionId);
+      this.audioPipelines.delete(sessionId);
+    });
+
     session.events.onReconnected(() => {
       this.activeSessions.set(sessionId, session);
-      speakText('Reconnected').catch(console.error);
+      // Re-create audio pipeline for the reconnected session
+      const reconnectedAudio = new AudioPipeline(session, caps.hasSpeaker);
+      this.audioPipelines.set(sessionId, reconnectedAudio);
+      reconnectedAudio.speak('Reconnected').catch(console.error);
     });
-    session.events.onError((error: Error) => { console.error(`[mentra-session] ${error.message}`); });
+
+    session.events.onError((error: Error) => {
+      console.error(`[mentra-session] ${error.message}`);
+    });
 
     try { session.dashboard?.content?.writeToMain('WeaveLogic AI - Active'); } catch { /* unsupported */ }
 
     // Force subscription update (SDK timing bug workaround)
+    // The SDK's bug007-fix-v2 patch may count 0 handlers before we register them.
+    // Manually trigger subscription refresh after handlers are set.
     try { await session.updateSubscriptions?.(); } catch { /* optional */ }
 
-    console.log(`[mentra-session] All handlers registered for ${sessionId}`);
+    console.log(`[mentra-session] All handlers registered for ${sessionId} (state tracking active)`);
   }
 
   // -----------------------------------------------------------------------
-  // onToolCall — AI-triggered actions
+  // onToolCall -- AI-triggered actions
   // -----------------------------------------------------------------------
 
   /**
@@ -341,15 +413,32 @@ class MentraAppServer {
   /**
    * Send a query to the OpenClaw gateway and return the text response.
    * Supports optional base64 image data for vision queries.
+   *
+   * When a SessionState is provided, conversation context (last 10 messages)
+   * is prepended to the request for context-aware responses.
    */
   private async queryOpenClaw(
     message: string,
+    sessionState?: SessionState,
     options: { imageBase64?: string; model?: string } = {},
   ): Promise<string> {
     const { imageBase64, model } = options;
 
     const messages: OpenClawMessage[] = [];
 
+    // Include conversation context if available
+    if (sessionState) {
+      const contextMessages = sessionState.buildContextMessages();
+      // Only include text-based context (skip the current message which we add below)
+      // Exclude the last message if it matches what we're about to send
+      for (const ctx of contextMessages) {
+        if (ctx.content !== message) {
+          messages.push({ role: ctx.role, content: ctx.content });
+        }
+      }
+    }
+
+    // Add the current user message
     if (imageBase64) {
       messages.push({
         role: 'user',
@@ -395,68 +484,8 @@ class MentraAppServer {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Detect session capabilities with safe defaults */
-function detectCapabilities(session: MentraSession): SessionCapabilities {
-  return {
-    hasDisplay: session.capabilities?.hasDisplay !== false && !!session.layouts,
-    hasSpeaker: session.capabilities?.hasSpeaker !== false && !!session.audio,
-    hasCamera: session.capabilities?.hasCamera !== false && !!session.camera,
-    hasMicrophone: session.capabilities?.hasMicrophone !== false,
-  };
-}
-
-/** Create a safe text display helper */
-function createShowText(
-  session: MentraSession,
-  caps: SessionCapabilities,
-): (text: string) => Promise<void> {
-  return async (text: string) => {
-    if (!caps.hasDisplay) return;
-    try {
-      await session.layouts.showTextWall(text);
-    } catch (e) {
-      console.log('[mentra-session] showTextWall error:', (e as Error).message);
-    }
-  };
-}
-
-/** Create a safe TTS helper */
-function createSpeakText(
-  session: MentraSession,
-  caps: SessionCapabilities,
-): (text: string) => Promise<void> {
-  return async (text: string) => {
-    if (!caps.hasSpeaker) return;
-    try {
-      await session.audio.speak(text);
-    } catch (e) {
-      console.error('[mentra-session] TTS error:', (e as Error).message);
-    }
-  };
-}
-
-/** Build a MentraResponse with formatted display text and audio text */
-function buildResponse(rawText: string): MentraResponse {
-  return {
-    text: rawText,
-    displayText: formatForGlasses(rawText),
-    audioText: rawText,
-  };
-}
-
-/** Convert ArrayBuffer to base64 string */
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  let binary = '';
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
-}
-
 // Re-exports from sibling modules
 export { resolveConfig, validateConfig, configFromEnv, MENTRA_CHANNEL_DEFAULTS } from './config';
+export { SessionState } from './session-state';
+export type { ConversationMessage, SessionMetadata } from './session-state';
+export { AudioPipeline } from './audio-pipeline';

@@ -1,5 +1,5 @@
 /**
- * Workflow screen — displayed when a workflow is active.
+ * Workflow screen -- displayed when a workflow is active.
  *
  * Content varies by active tab:
  *   Tab 0 (Chat):     Workflow conversation (timeline view)
@@ -7,6 +7,16 @@
  *   Tab 2 (Files):    Workflow files and diffs
  *   Tab 3 (Settings): Workflow-scoped settings
  */
+
+import {
+  ConversationThread,
+  TimelineEntry,
+  UserMessage,
+  AgentMessage,
+  ToolOutput,
+  ApprovalCard,
+} from '../components/chat';
+import type { ConversationEntry } from '../components/chat';
 
 interface WorkflowProps {
   workflowId: string;
@@ -24,85 +34,228 @@ export function Workflow({ workflowId, activeTab }: WorkflowProps) {
 }
 
 // ---------------------------------------------------------------------------
+// Sample data for Chat tab
+// ---------------------------------------------------------------------------
+
+const SAMPLE_TIMESTAMP = Date.now() - 300_000; // 5 min ago
+
+function buildSampleEntries(): ConversationEntry[] {
+  return [
+    {
+      id: 'status-1',
+      type: 'status',
+      timestamp: SAMPLE_TIMESTAMP,
+      content: (
+        <TimelineEntry timestamp="9:12 PM" dotColor="success">
+          <div style={{
+            fontSize: '12px',
+            color: 'var(--text-subtle)',
+            fontStyle: 'italic',
+          }}>
+            Workflow started by Adrian
+          </div>
+        </TimelineEntry>
+      ),
+    },
+    {
+      id: 'user-1',
+      type: 'user',
+      timestamp: SAMPLE_TIMESTAMP + 10_000,
+      content: (
+        <TimelineEntry timestamp="9:12 PM" dotColor="default">
+          <UserMessage
+            content="Refactor the auth service to use JWT with refresh token rotation. Replace the current session-based auth."
+            timestamp="9:12 PM"
+          />
+        </TimelineEntry>
+      ),
+    },
+    {
+      id: 'agent-1',
+      type: 'agent',
+      timestamp: SAMPLE_TIMESTAMP + 60_000,
+      content: (
+        <TimelineEntry timestamp="9:13 PM" dotColor="success">
+          <AgentMessage
+            agentName="coder-alpha"
+            content="Understood. I'll structure this as a **3-phase migration**: (1) add JWT layer alongside sessions, (2) migrate endpoints, (3) deprecate sessions. Starting with the token service."
+            timestamp="9:13 PM"
+            status="idle"
+            initials="C"
+          />
+        </TimelineEntry>
+      ),
+    },
+    {
+      id: 'tool-1',
+      type: 'tool',
+      timestamp: SAMPLE_TIMESTAMP + 120_000,
+      content: (
+        <TimelineEntry timestamp="9:14 PM" dotColor="default">
+          <AgentMessage
+            agentName="coder-alpha"
+            content="Created token service with rotation logic."
+            timestamp="9:14 PM"
+            status="idle"
+            initials="C"
+          />
+          <div style={{ paddingLeft: '30px' }}>
+            <ToolOutput
+              toolName="src/auth/token-service.ts"
+              output={`export class TokenService {
+  private readonly secret: string;
+  private readonly accessTTL = '15m';
+  private readonly refreshTTL = '7d';
+
+  async generatePair(userId: string) {
+    const access = await this.sign(
+      { sub: userId, type: 'access' },
+      this.accessTTL
+    );
+    const refresh = await this.sign(
+      { sub: userId, type: 'refresh' },
+      this.refreshTTL
+    );
+    return { access, refresh };
+  }
+}`}
+            />
+          </div>
+        </TimelineEntry>
+      ),
+    },
+    {
+      id: 'agent-2',
+      type: 'agent',
+      timestamp: SAMPLE_TIMESTAMP + 180_000,
+      content: (
+        <TimelineEntry timestamp="9:18 PM" dotColor="default">
+          <AgentMessage
+            agentName="scout-recon"
+            content="Found **14 endpoints** using session auth. 3 also pass tokens to external services and will need special handling."
+            timestamp="9:18 PM"
+            status="idle"
+            initials="S"
+          />
+        </TimelineEntry>
+      ),
+    },
+    {
+      id: 'approval-1',
+      type: 'approval',
+      timestamp: SAMPLE_TIMESTAMP + 240_000,
+      content: (
+        <TimelineEntry timestamp="9:20 PM" dotColor="accent" isActive>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            marginBottom: '6px',
+          }}>
+            <span style={{
+              width: '20px',
+              height: '20px',
+              borderRadius: '50%',
+              border: '2px solid var(--accent)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '8px',
+              fontWeight: 700,
+              color: 'var(--text-muted)',
+              flexShrink: 0,
+            }}>
+              R
+            </span>
+            <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-muted)' }}>
+              reviewer-sec
+            </span>
+          </div>
+          <ApprovalCard
+            question="Ready to apply changes to 14 endpoints. This will modify auth handling across the entire API surface. Proceed?"
+            showEdit
+          />
+        </TimelineEntry>
+      ),
+    },
+    {
+      id: 'thinking-1',
+      type: 'agent',
+      timestamp: SAMPLE_TIMESTAMP + 300_000,
+      content: (
+        <TimelineEntry timestamp="now" dotColor="accent" isActive isLast>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            marginBottom: '6px',
+          }}>
+            <span style={{
+              width: '20px',
+              height: '20px',
+              borderRadius: '50%',
+              border: '2px solid var(--success)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '8px',
+              fontWeight: 700,
+              color: 'var(--text-muted)',
+              flexShrink: 0,
+            }}>
+              W
+            </span>
+            <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-muted)' }}>
+              worker-3
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: '4px', padding: '4px 0' }}>
+            <span className="animate-thinking" style={{
+              width: '4px', height: '4px', borderRadius: '50%',
+              background: 'var(--text-subtle)', animationDelay: '0s',
+            }} />
+            <span className="animate-thinking" style={{
+              width: '4px', height: '4px', borderRadius: '50%',
+              background: 'var(--text-subtle)', animationDelay: '0.16s',
+            }} />
+            <span className="animate-thinking" style={{
+              width: '4px', height: '4px', borderRadius: '50%',
+              background: 'var(--text-subtle)', animationDelay: '0.32s',
+            }} />
+          </div>
+        </TimelineEntry>
+      ),
+    },
+  ];
+}
+
+// ---------------------------------------------------------------------------
 // Tab 0: Chat (Workflow Conversation)
 // ---------------------------------------------------------------------------
 
 function WorkflowChat({ workflowId }: { workflowId: string }) {
+  const entries = buildSampleEntries();
+
   return (
-    <div className="content-padding" style={{ paddingTop: '12px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Workflow header */}
-      <div style={{ paddingBottom: '16px' }}>
+      <div className="content-padding" style={{ paddingTop: '12px', paddingBottom: '16px', flexShrink: 0 }}>
         <h1 className="text-section-title">Workflow {workflowId}</h1>
         <div className="text-meta" style={{ marginTop: '4px' }}>
           Active conversation
         </div>
       </div>
 
-      {/* Timeline */}
-      <div style={{ position: 'relative', paddingLeft: '20px' }}>
-        {/* Timeline line */}
-        <div style={{
-          position: 'absolute',
-          left: '4px',
-          top: '0',
-          bottom: '0',
-          width: '1px',
-          background: 'var(--border)',
-        }} />
+      {/* Conversation thread */}
+      <ConversationThread entries={entries} />
 
-        {/* Timeline entries */}
-        <TimelineEntry
-          type="user"
-          author="You"
-          time="2:15 PM"
-          content="Deploy the authentication fix to staging"
-          isActive={false}
-        />
-        <TimelineEntry
-          type="agent"
-          author="OpenClaw"
-          time="2:15 PM"
-          content="I'll deploy the auth fix. Let me check the current staging status first..."
-          isActive={false}
-        />
-        <TimelineEntry
-          type="tool"
-          author="Tool: deploy-check"
-          time="2:16 PM"
-          content="staging: healthy (v2.3.1)\nauth-service: running\nlast-deploy: 3h ago"
-          isActive={false}
-        />
-        <TimelineEntry
-          type="agent"
-          author="OpenClaw"
-          time="2:16 PM"
-          content="Staging is healthy. Ready to deploy. Shall I proceed?"
-          isActive={true}
-        />
-
-        {/* Thinking indicator placeholder */}
-        <div style={{ padding: '12px 0', display: 'flex', gap: '4px' }}>
-          <span className="animate-thinking" style={{
-            width: '4px', height: '4px', borderRadius: '50%',
-            background: 'var(--text-subtle)', animationDelay: '0s',
-          }} />
-          <span className="animate-thinking" style={{
-            width: '4px', height: '4px', borderRadius: '50%',
-            background: 'var(--text-subtle)', animationDelay: '0.16s',
-          }} />
-          <span className="animate-thinking" style={{
-            width: '4px', height: '4px', borderRadius: '50%',
-            background: 'var(--text-subtle)', animationDelay: '0.32s',
-          }} />
-        </div>
-      </div>
-
-      {/* Input area placeholder */}
+      {/* Input area */}
       <div style={{
         position: 'sticky',
         bottom: '68px',
-        padding: '12px 0',
+        padding: '12px 20px',
         background: 'var(--bg)',
+        flexShrink: 0,
       }}>
         <div style={{
           display: 'flex',
@@ -226,69 +379,6 @@ function WorkflowSettings({ workflowId: _workflowId }: { workflowId: string }) {
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
-
-function TimelineEntry({ type, author, time, content, isActive }: {
-  type: 'user' | 'agent' | 'tool' | 'status';
-  author: string;
-  time: string;
-  content: string;
-  isActive: boolean;
-}) {
-  const dotColor = isActive ? 'var(--accent)' : 'var(--text-subtle)';
-  const isToolOutput = type === 'tool';
-
-  return (
-    <div style={{ position: 'relative', paddingBottom: '16px' }}>
-      {/* Timeline dot */}
-      <div style={{
-        position: 'absolute',
-        left: '-20px',
-        top: '6px',
-        width: '9px',
-        height: '9px',
-        borderRadius: '50%',
-        background: dotColor,
-        boxShadow: isActive ? `0 0 8px ${dotColor}` : 'none',
-      }} />
-
-      {/* Entry content */}
-      <div>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '4px' }}>
-          {type === 'agent' && (
-            <span style={{
-              width: '20px',
-              height: '20px',
-              borderRadius: '50%',
-              border: '1.5px solid var(--text-subtle)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '8px',
-              fontWeight: 600,
-              flexShrink: 0,
-            }}>
-              OC
-            </span>
-          )}
-          <span className="text-body" style={{ fontWeight: 500 }}>{author}</span>
-          <span className="text-meta">{time}</span>
-        </div>
-        <div style={{
-          padding: isToolOutput ? '8px 10px' : '0',
-          background: isToolOutput ? 'rgba(255,255,255,0.02)' : 'transparent',
-          borderRadius: isToolOutput ? '6px' : '0',
-          fontFamily: isToolOutput ? 'var(--font-mono)' : 'inherit',
-          fontSize: isToolOutput ? '12px' : '14px',
-          color: isToolOutput ? 'var(--text-muted)' : 'var(--text)',
-          whiteSpace: isToolOutput ? 'pre-wrap' : 'normal',
-          lineHeight: 1.6,
-        }}>
-          {content}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function TaskItem({ title, status, priority }: {
   title: string;
