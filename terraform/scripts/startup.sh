@@ -1,43 +1,35 @@
 #!/bin/bash
 # terraform/scripts/startup.sh
-# VM startup script: installs Node.js 22, pm2, openclaw, cloudflared.
-# Runs once on first boot; subsequent deploys use CI/CD pipeline.
+# VM metadata startup script for c4a-standard-1 (ARM64 Debian 12).
+# Runs once on first boot; subsequent deploys use CI/CD or scripts/deploy.sh.
 
 set -e
 
-# Install essential packages (git not included in base Debian image)
-apt-get update && apt-get install -y git curl
+# Install essentials (git not in base Debian image)
+apt-get update -qq && apt-get install -y git curl
 
 # Install Node.js 22
 curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
 apt-get install -y nodejs
 
-# Install pm2
-npm install -g pm2
+# Install pm2 + OpenClaw
+npm install -g pm2 openclaw@latest
 
-# Install OpenClaw
-npm install -g openclaw@latest
+# Install cloudflared (ARM64 binary — apt repo doesn't support ARM Debian)
+curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64 -o /usr/local/bin/cloudflared
+chmod +x /usr/local/bin/cloudflared
 
-# Install cloudflared
-curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | gpg --dearmor -o /usr/share/keyrings/cloudflare-main.gpg
-echo 'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared focal main' | tee /etc/apt/sources.list.d/cloudflared.list
-apt-get update && apt-get install -y cloudflared
-
-# Create app directory
+# Clone repo
 mkdir -p /opt/moltworker
 cd /opt/moltworker
-
-# Clone repo (first boot only)
 if [ ! -d ".git" ]; then
   git clone https://github.com/weave-logic-ai/moltworker.git .
 fi
 
-# Install bridge dependencies
-cd /opt/moltworker/skills/mentra-bridge
-npm install @mentra/sdk
-cd /opt/moltworker
+# Install mentra-bridge deps
+cd skills/mentra-bridge && npm install @mentra/sdk && cd /opt/moltworker
 
-# Setup pm2 to survive reboots
-pm2 startup systemd
+# pm2 auto-start on boot
+pm2 startup systemd -u root --hp /root
 
 echo "Startup complete. Configure .env and start services with pm2."

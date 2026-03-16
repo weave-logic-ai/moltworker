@@ -1,11 +1,15 @@
 #!/bin/bash
 # scripts/setup-vm.sh
-# Manual VM setup script. Mirrors terraform/scripts/startup.sh but intended
-# for running interactively on a fresh VM or re-provisioning.
+# One-time VM setup for a fresh c4a-standard-1 (ARM64) Debian 12 instance.
+# Run as root: sudo bash scripts/setup-vm.sh
 
 set -e
 
 echo "=== Moltworker VM Setup ==="
+
+# Install essentials
+echo "Installing git and curl..."
+apt-get update -qq && apt-get install -y git curl
 
 # Install Node.js 22
 echo "Installing Node.js 22..."
@@ -13,47 +17,51 @@ curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
 apt-get install -y nodejs
 echo "Node.js $(node --version) installed"
 
-# Install pm2 globally
+# Install pm2
 echo "Installing pm2..."
 npm install -g pm2
 
-# Install OpenClaw globally
+# Install OpenClaw
 echo "Installing OpenClaw..."
 npm install -g openclaw@latest
 
-# Install cloudflared
+# Install cloudflared (ARM64 binary — apt repo doesn't support ARM Debian)
 echo "Installing cloudflared..."
-curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | gpg --dearmor -o /usr/share/keyrings/cloudflare-main.gpg
-echo 'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared focal main' | tee /etc/apt/sources.list.d/cloudflared.list
-apt-get update && apt-get install -y cloudflared
+curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64 -o /usr/local/bin/cloudflared
+chmod +x /usr/local/bin/cloudflared
 
-# Create app directory and clone repo
+# Clone repo
 echo "Setting up /opt/moltworker..."
 mkdir -p /opt/moltworker
 cd /opt/moltworker
-
 if [ ! -d ".git" ]; then
   git clone https://github.com/weave-logic-ai/moltworker.git .
-  echo "Repository cloned"
 else
-  echo "Repository already exists, pulling latest..."
-  git pull origin main
+  echo "Repo exists, pulling latest..."
+  git pull
 fi
 
 # Install mentra-bridge dependencies
-echo "Installing mentra-bridge dependencies..."
+echo "Installing mentra-bridge deps..."
 cd /opt/moltworker/skills/mentra-bridge
 npm install @mentra/sdk
 cd /opt/moltworker
 
-# Configure pm2 to start on boot
-echo "Configuring pm2 startup..."
-pm2 startup systemd
+# pm2 startup
+pm2 startup systemd -u root --hp /root
 
 echo ""
 echo "=== Setup Complete ==="
+echo "Versions:"
+echo "  Node:        $(node --version)"
+echo "  pm2:         $(pm2 --version 2>/dev/null)"
+echo "  OpenClaw:    $(openclaw --version 2>&1 | head -1)"
+echo "  cloudflared: $(cloudflared --version 2>&1)"
+echo ""
 echo "Next steps:"
-echo "  1. Copy .env.example to /opt/moltworker/.env and fill in secrets"
-echo "  2. Run: bash scripts/openclaw-config.sh"
-echo "  3. Run: pm2 start ecosystem.config.js"
-echo "  4. Run: pm2 save"
+echo "  1. Create /opt/moltworker/.env from .env.example"
+echo "  2. Create wrapper scripts: scripts/run-openclaw.sh, scripts/run-mentra-bridge.sh"
+echo "  3. pm2 start scripts/run-openclaw.sh --name openclaw --interpreter bash"
+echo "  4. pm2 start scripts/run-mentra-bridge.sh --name mentra-bridge --interpreter bash"
+echo "  5. pm2 save"
+echo "  6. Set up cloudflared tunnel (token from CF dashboard)"

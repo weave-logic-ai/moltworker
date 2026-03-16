@@ -1,117 +1,75 @@
 #!/bin/bash
 # scripts/health-check.sh
 # Cron-compatible health probe for moltworker services.
-# Checks OpenClaw gateway, Mentra bridge, cloudflared, and pm2 processes.
-# Sends webhook alert on failure.
+# Exit 0 = healthy, 1 = one or more checks failed.
 #
-# Exit codes: 0 = all healthy, 1 = one or more checks failed
+# Cron: */5 * * * * /opt/moltworker/scripts/health-check.sh >> /var/log/moltworker-health.log 2>&1
 #
 # Environment:
-#   ALERT_WEBHOOK_URL  - Discord/Slack incoming webhook URL (optional)
-#
-# Cron usage:
-#   */5 * * * * /opt/moltworker/scripts/health-check.sh >> /var/log/moltworker-health.log 2>&1
+#   ALERT_WEBHOOK_URL  - Discord/Slack webhook URL (optional)
 
 set -euo pipefail
 
-# Source .env if available
 if [ -f /opt/moltworker/.env ]; then
-  set -a
-  source /opt/moltworker/.env
-  set +a
+  set -a; source /opt/moltworker/.env; set +a
 fi
 
 FAILURES=()
 TIMESTAMP=$(date -Iseconds)
 
-# --- Check 1: OpenClaw gateway ---
-if curl -sf --max-time 5 "http://localhost:18789/v1/models" >/dev/null 2>&1; then
-  : # healthy
+# Check 1: OpenClaw gateway (/health returns JSON)
+if curl -sf --max-time 5 "http://localhost:18789/health" | grep -q '"ok":true' 2>/dev/null; then
+  :
 else
-  FAILURES+=("OpenClaw gateway not responding on localhost:18789")
+  FAILURES+=("OpenClaw gateway not healthy on localhost:18789")
 fi
 
-# --- Check 2: Mentra bridge ---
+# Check 2: Mentra bridge
 if curl -sf --max-time 5 "http://localhost:7010/" >/dev/null 2>&1; then
-  : # healthy
+  :
 else
   FAILURES+=("Mentra bridge not responding on localhost:7010")
 fi
 
-# --- Check 3: cloudflared ---
-if systemctl is-active cloudflared >/dev/null 2>&1; then
-  : # healthy via systemd
-elif pgrep -f cloudflared >/dev/null 2>&1; then
-  : # healthy via process
+# Check 3: cloudflared
+if systemctl is-active cloudflared >/dev/null 2>&1 || pgrep -f cloudflared >/dev/null 2>&1; then
+  :
 else
   FAILURES+=("cloudflared is not running")
 fi
 
-# --- Check 4: pm2 processes ---
+# Check 4: pm2 processes
 if command -v pm2 &>/dev/null; then
-  PM2_JSON=$(pm2 jlist 2>/dev/null || echo "[]")
-  PM2_COUNT=$(echo "$PM2_JSON" | node -e "
-    const procs = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
-    const stopped = procs.filter(p => p.pm2_env.status !== 'online');
-    stopped.forEach(p => console.log(p.name + ':' + p.pm2_env.status));
+  PM2_STOPPED=$(pm2 jlist 2>/dev/null | node -e "
+    const p = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
+    p.filter(x => x.pm2_env.status !== 'online').forEach(x => console.log(x.name + ':' + x.pm2_env.status));
   " 2>/dev/null || echo "")
-
-  if [ -n "$PM2_COUNT" ]; then
-    while IFS= read -r line; do
-      if [ -n "$line" ]; then
-        FAILURES+=("pm2 process $line")
-      fi
-    done <<< "$PM2_COUNT"
-  fi
-else
-  FAILURES+=("pm2 not found in PATH")
+  while IFS= read -r line; do
+    [ -n "$line" ] && FAILURES+=("pm2 process $line")
+  done <<< "$PM2_STOPPED"
 fi
 
-# --- Report ---
+# Report
 if [ ${#FAILURES[@]} -eq 0 ]; then
-  echo "[$TIMESTAMP] HEALTHY: all checks passed"
+  echo "[$TIMESTAMP] HEALTHY"
   exit 0
 fi
 
-# Build failure message
 FAIL_MSG="[$TIMESTAMP] UNHEALTHY: ${#FAILURES[@]} check(s) failed"
-for f in "${FAILURES[@]}"; do
-  FAIL_MSG+="\n  - $f"
-done
-
+for f in "${FAILURES[@]}"; do FAIL_MSG+="\n  - $f"; done
 echo -e "$FAIL_MSG"
 
-# --- Send webhook alert ---
+# Webhook alert
 if [ -n "${ALERT_WEBHOOK_URL:-}" ]; then
-  HOSTNAME=$(hostname 2>/dev/null || echo "moltworker-vm")
-  PLAIN_FAILURES=""
-  for f in "${FAILURES[@]}"; do
-    PLAIN_FAILURES+="\\n- $f"
-  done
-
-  # Detect webhook type by URL pattern
+  HOST=$(hostname 2>/dev/null || echo "moltworker")
+  BODY=""
+  for f in "${FAILURES[@]}"; do BODY+="\\n- $f"; done
   if echo "$ALERT_WEBHOOK_URL" | grep -q "discord"; then
-    # Discord webhook format
-    PAYLOAD=$(cat <<EOFPAYLOAD
-{
-  "content": "**Moltworker Health Alert** ($HOSTNAME)\\n$PLAIN_FAILURES\\n\\nTimestamp: $TIMESTAMP"
-}
-EOFPAYLOAD
-    )
+    PAYLOAD="{\"content\": \"**Moltworker Alert** ($HOST)\\n$BODY\"}"
   else
-    # Slack webhook format (also works for generic webhooks)
-    PAYLOAD=$(cat <<EOFPAYLOAD
-{
-  "text": "Moltworker Health Alert ($HOSTNAME)\\n$PLAIN_FAILURES\\n\\nTimestamp: $TIMESTAMP"
-}
-EOFPAYLOAD
-    )
+    PAYLOAD="{\"text\": \"Moltworker Alert ($HOST)\\n$BODY\"}"
   fi
-
-  curl -sf --max-time 10 \
-    -H "Content-Type: application/json" \
-    -d "$PAYLOAD" \
-    "$ALERT_WEBHOOK_URL" >/dev/null 2>&1 || echo "WARNING: failed to send webhook alert"
+  curl -sf --max-time 10 -H "Content-Type: application/json" -d "$PAYLOAD" "$ALERT_WEBHOOK_URL" >/dev/null 2>&1 || true
 fi
 
 exit 1

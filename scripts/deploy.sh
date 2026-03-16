@@ -1,7 +1,7 @@
 #!/bin/bash
 # scripts/deploy.sh
-# Standalone deploy script for manual use on the VM.
-# Pulls latest code, installs deps, and restarts pm2 services.
+# Deploy latest code to the VM and restart services.
+# Run on the VM: sudo bash scripts/deploy.sh
 
 set -e
 
@@ -9,16 +9,18 @@ echo "=== Deploying moltworker ==="
 
 cd /opt/moltworker
 
-echo "Pulling latest from main..."
-git pull origin main
+echo "Pulling latest..."
+git pull
 
 echo "Installing dependencies..."
-npm install
+npm install --omit=dev
 
-echo "Restarting pm2 services..."
-pm2 restart ecosystem.config.cjs
+echo "Installing mentra-bridge deps..."
+cd skills/mentra-bridge && npm install @mentra/sdk && cd /opt/moltworker
 
-echo "Saving pm2 process list..."
+echo "Restarting services..."
+pm2 restart all
 pm2 save
 
 echo "=== Deploy complete ==="
+pm2 list
