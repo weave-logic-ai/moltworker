@@ -23,7 +23,7 @@ variable "gcp_zone" {
 variable "gcp_machine_type" {
   description = "GCP machine type (e.g., e2-medium, c4a-standard-1)"
   type        = string
-  default     = "e2-medium"
+  default     = "c4a-standard-1"
 }
 
 # --- Networking ---
@@ -37,7 +37,7 @@ variable "domain" {
 variable "ssh_allowed_ips" {
   description = "IPs allowed to SSH into the VM"
   type        = list(string)
-  default     = ["0.0.0.0/0"] # Restrict in production
+  default     = ["107.209.9.134/32"]
 }
 
 # --- Secrets ---
@@ -53,5 +53,5 @@ variable "use_secret_manager" {
 variable "monitoring_email" {
   description = "Email address for monitoring alert notifications"
   type        = string
-  default     = ""
+  default     = "mathew@weavelogic.ai"
 }

@@ -5,6 +5,9 @@
 
 set -e
 
+# Install essential packages (git not included in base Debian image)
+apt-get update && apt-get install -y git curl
+
 # Install Node.js 22
 curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
 apt-get install -y nodejs

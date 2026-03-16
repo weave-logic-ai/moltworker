@@ -10,11 +10,11 @@ terraform {
     }
   }
 
-  # State stored in GCS bucket for team access and locking
-  backend "gcs" {
-    bucket = "moltworker-tf-state"
-    prefix = "terraform/state"
-  }
+  # Local state for now. Switch to GCS backend after bucket is created:
+  #   backend "gcs" {
+  #     bucket = "moltworker-tf-state"
+  #     prefix = "terraform/state"
+  #   }
 }
 
 provider "google" {

@@ -8,9 +8,9 @@ resource "google_compute_instance" "moltworker" {
 
   boot_disk {
     initialize_params {
-      image = "debian-cloud/debian-12"
+      image = "debian-cloud/debian-12-arm64"
       size  = 20 # GB
-      type  = "pd-ssd"
+      type  = "hyperdisk-balanced"
     }
   }
 
