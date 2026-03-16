@@ -1,0 +1,93 @@
+# MentraOS Quickstart Guide
+
+> Source: https://docs.mentraglass.com/app-devs/getting-started/quickstart
+
+> Build your first MentraOS smart glasses app in under 15 minutes using the MentraOS example app template.
+
+MentraOS is how you write smart glasses apps. In this Quickstart, we go from zero to fully functioning app in less than 15 minutes. You just need a phone and some basic TypeScript knowledge to get started, you can get started **without smart glasses**, or use one of [these smart glasses](https://github.com/Mentra-Community/MentraOS/blob/main/glasses-compatibility.md).
+
+### Step 1: Install the Mentra app on your phone
+
+Install MentraOS on your Android or iPhone from [MentraGlass.com/OS](https://mentraglass.com/os).
+
+### Step 2: Set up ngrok
+
+We are going to use ngrok to expose your local app to the internet. This is useful for development, but when you're ready to go live, you'll want to [deploy to a cloud service](/deployment).
+
+1. [Install ngrok](https://ngrok.com/docs/getting-started/)
+2. Create an ngrok account
+3. [Set up a static address/URL in the ngrok dashboard](https://dashboard.ngrok.com/)
+
+> Make sure you run the `ngrok config add-authtoken <your_authtoken>` line. Make sure you select `Static Domain`, then generate a static domain.
+
+### Step 3: Register your app with the Mentra Relay Server
+
+This example app will send traffic through the Mentra Relay Server, which connects your phone to your app through the internet. Later, you can run your own Relay Server.
+
+1. Log in to [console.mentraglass.com](https://console.mentraglass.com/) with the same account you're using for MentraOS.
+2. Click "Create App". Set a unique package name like `com.yourName.yourAppName`. For "Public URL", enter your ngrok static URL.
+3. Add microphone permission.
+
+> This automatically installs the app for your user - check the Mentra app on your phone. For other people to test the app, they need to install it. You can retrieve your app's install link from "My Apps" page, click the *Share* icon.
+
+### Step 4: Start your app
+
+Ensure you have [Node.js v18 or later](https://nodejs.org/en/download/) and [Bun](https://bun.sh/docs/installation) installed.
+
+1. Pick the example app template that matches your smart glasses:
+
+   **Camera Glasses** (Compatible glasses: Mentra Live)
+
+   Use the **Camera Example App** -- it captures photos using the glasses' camera and shows them on the user's phone.
+
+   Repository: [MentraOS-Camera-Example-App](https://github.com/Mentra-Community/MentraOS-Camera-Example-App)
+
+   Go to the link above and click *Use this Template* then *Create a new repository*. Clone your new repo locally using the URL from your newly created repository.
+
+   **Display Glasses** (Compatible glasses: Even Realities G1, Mentra Mach1, Vuzix Z100)
+
+   Use the **Display Example App** -- it displays spoken words as live captions on the glasses' HUD.
+
+   Repository: [MentraOS-Display-Example-App](https://github.com/Mentra-Community/MentraOS-Display-Example-App)
+
+   Go to the link above and click *Use this Template* then *Create a new repository*. Clone your new repo locally using the URL from your newly created repository.
+
+2. Navigate to your repo directory and install dependencies:
+
+   ```bash
+   cd <your-repo-name>
+   bun install
+   ```
+
+3. Set up your environment variables:
+
+   Create a `.env` file in the root directory by copying the example, then edit the `.env` file with your own app's details.
+
+   ```bash
+   cp .env.example .env
+   ```
+
+4. Run your app:
+
+   ```bash
+   bun run dev
+   ```
+
+5. Expose your app to the internet with ngrok:
+
+   ```bash
+   ngrok http --url=<YOUR_NGROK_URL_HERE> 3000
+   ```
+
+   Note: `3000` is the port. It must match what is in the app config.
+
+### Step 5: App Running!
+
+Go to your phone and open Mentra. Start your app. Begin speaking, and you'll see what you say overlaid on your smart glasses display. You'll also see logs in the console.
+
+Congratulations, you just built your first smart glasses app!
+
+## Next Steps
+
+- Check out our [Example Apps](./example-apps) page for more templates and advanced examples
+- Join our [Discord community](https://discord.gg/5ukNvkEAqT) for help and support

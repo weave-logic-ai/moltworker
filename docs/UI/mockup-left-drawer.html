@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Clawdflare Bridge - Context Selector</title>
+<style>
+/* ============================================================
+   Design Tokens
+   ============================================================ */
+:root {
+  --bg: #09090b;
+  --drawer-bg: #0c0c0f;
+  --card-hover: rgba(255,255,255,0.03);
+  --border: rgba(255,255,255,0.06);
+  --border-strong: rgba(255,255,255,0.12);
+  --text: #fafafa;
+  --text-muted: #71717a;
+  --text-subtle: #52525b;
+  --accent: #e94560;
+  --success: #4ecca3;
+  --warning: #f59e0b;
+  --radius: 12px;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  height: 100%;
+}
+
+body { height: 100%; overflow: hidden; display: flex; flex-direction: column; }
+
+button {
+  font-family: inherit; font-size: inherit; cursor: pointer;
+  border: none; background: none; color: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ============================================================
+   App Shell (showing drawer open state)
+   ============================================================ */
+.app {
+  display: flex; flex-direction: column; height: 100%;
+  max-width: 428px; margin: 0 auto; width: 100%;
+  position: relative; overflow: hidden; background: var(--bg);
+}
+
+/* Backdrop */
+.drawer-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 200;
+}
+
+/* Drawer */
+.drawer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 80%;
+  background: var(--drawer-bg);
+  z-index: 210;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ============================================================
+   Search
+   ============================================================ */
+.drawer-search {
+  padding: 16px 20px 12px;
+  flex-shrink: 0;
+}
+.drawer-search__input {
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 14px;
+  color: var(--text);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  outline: none;
+  transition: border-color 200ms ease;
+  font-family: var(--font-sans);
+}
+.drawer-search__input::placeholder {
+  color: var(--text-subtle);
+}
+.drawer-search__input:focus {
+  border-color: var(--border-strong);
+}
+
+/* ============================================================
+   Scrollable List
+   ============================================================ */
+.drawer-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 0 calc(20px + var(--safe-bottom));
+  -webkit-overflow-scrolling: touch;
+}
+.drawer-list::-webkit-scrollbar { display: none; }
+
+/* ============================================================
+   Section Label
+   ============================================================ */
+.drawer-section {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--text-subtle);
+  padding: 20px 20px 8px;
+}
+
+/* ============================================================
+   Client Row
+   ============================================================ */
+.client-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+.client-row:active {
+  background: var(--card-hover);
+}
+.client-row__left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.client-row__name {
+  font-size: 14px;
+  font-weight: 500;
+}
+.client-row__badge {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.badge--pro {
+  color: var(--accent);
+  background: rgba(233, 69, 96, 0.1);
+}
+.badge--enterprise {
+  color: #a78bfa;
+  background: rgba(139, 92, 246, 0.12);
+}
+.badge--starter {
+  color: var(--text-muted);
+  background: rgba(255,255,255,0.06);
+}
+.client-row__chevron {
+  color: var(--text-subtle);
+  font-size: 14px;
+  transition: transform 200ms ease;
+}
+.client-row--expanded .client-row__chevron {
+  transform: rotate(90deg);
+}
+
+/* ============================================================
+   Project Row (indented)
+   ============================================================ */
+.project-group {
+  border-bottom: 1px solid var(--border);
+}
+.project-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px 10px 44px;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+.project-row:active {
+  background: var(--card-hover);
+}
+.project-row__name {
+  font-size: 13px;
+  color: var(--text);
+}
+.project-row__count {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-subtle);
+}
+
+/* ============================================================
+   Workflow Row (deeper indent)
+   ============================================================ */
+.workflow-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 20px 8px 62px;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+.workflow-row:active {
+  background: var(--card-hover);
+}
+.workflow-row--active .workflow-row__name {
+  color: var(--accent);
+}
+.workflow-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.workflow-dot--active { background: var(--success); }
+.workflow-dot--idle { background: var(--text-subtle); }
+.workflow-dot--pending { background: var(--warning); }
+.workflow-row__name {
+  font-size: 13px;
+  color: rgba(250,250,250,0.8);
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.workflow-row__time {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-subtle);
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   Create Links
+   ============================================================ */
+.create-link {
+  display: block;
+  padding: 10px 20px;
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 150ms ease;
+}
+.create-link:active {
+  color: var(--text);
+}
+.create-link__plus {
+  color: var(--text-subtle);
+  margin-right: 4px;
+}
+.create-link--indent {
+  padding-left: 44px;
+}
+.create-link--indent2 {
+  padding-left: 62px;
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Backdrop -->
+  <div class="drawer-backdrop"></div>
+
+  <!-- Left Drawer -->
+  <div class="drawer">
+
+    <!-- Search -->
+    <div class="drawer-search">
+      <input class="drawer-search__input" type="text" placeholder="Search clients, projects...">
+    </div>
+
+    <!-- List -->
+    <div class="drawer-list">
+
+      <!-- Section: Clients -->
+      <div class="drawer-section">Clients</div>
+
+      <!-- Client: WeaveLogic (expanded) -->
+      <div class="project-group">
+        <div class="client-row client-row--expanded">
+          <div class="client-row__left">
+            <span class="client-row__name">WeaveLogic</span>
+            <span class="client-row__badge badge--enterprise">Enterprise</span>
+          </div>
+          <span class="client-row__chevron">&rsaquo;</span>
+        </div>
+
+        <!-- Project: MentraOS Core (expanded) -->
+        <div class="project-row">
+          <span class="project-row__name">MentraOS Core</span>
+          <span class="project-row__count">3 active</span>
+        </div>
+
+        <!-- Workflows under MentraOS Core -->
+        <div class="workflow-row workflow-row--active">
+          <span class="workflow-dot workflow-dot--active"></span>
+          <span class="workflow-row__name">Auth Service Refactor</span>
+          <span class="workflow-row__time">2m</span>
+        </div>
+        <div class="workflow-row">
+          <span class="workflow-dot workflow-dot--active"></span>
+          <span class="workflow-row__name">Container Deploy Pipeline</span>
+          <span class="workflow-row__time">8m</span>
+        </div>
+        <div class="workflow-row">
+          <span class="workflow-dot workflow-dot--pending"></span>
+          <span class="workflow-row__name">API Gateway Rate Limiting</span>
+          <span class="workflow-row__time">22m</span>
+        </div>
+
+        <button class="create-link create-link--indent2">
+          <span class="create-link__plus">+</span> New workflow
+        </button>
+
+        <!-- Project: Clawdflare Infra -->
+        <div class="project-row">
+          <span class="project-row__name">Clawdflare Infra</span>
+          <span class="project-row__count">1 active</span>
+        </div>
+
+        <div class="workflow-row">
+          <span class="workflow-dot workflow-dot--active"></span>
+          <span class="workflow-row__name">Edge CDN Configuration</span>
+          <span class="workflow-row__time">1h</span>
+        </div>
+        <div class="workflow-row">
+          <span class="workflow-dot workflow-dot--idle"></span>
+          <span class="workflow-row__name">DNS Migration</span>
+          <span class="workflow-row__time">2d</span>
+        </div>
+
+        <button class="create-link create-link--indent">
+          <span class="create-link__plus">+</span> New project
+        </button>
+      </div>
+
+      <!-- Client: XR Lab -->
+      <div class="project-group">
+        <div class="client-row">
+          <div class="client-row__left">
+            <span class="client-row__name">XR Lab</span>
+            <span class="client-row__badge badge--pro">Pro</span>
+          </div>
+          <span class="client-row__chevron">&rsaquo;</span>
+        </div>
+      </div>
+
+      <!-- Client: Acme Corp -->
+      <div class="project-group">
+        <div class="client-row">
+          <div class="client-row__left">
+            <span class="client-row__name">Acme Corp</span>
+            <span class="client-row__badge badge--starter">Starter</span>
+          </div>
+          <span class="client-row__chevron">&rsaquo;</span>
+        </div>
+      </div>
+
+      <!-- Client: Internal -->
+      <div class="project-group">
+        <div class="client-row">
+          <div class="client-row__left">
+            <span class="client-row__name">Internal</span>
+          </div>
+          <span class="client-row__chevron">&rsaquo;</span>
+        </div>
+      </div>
+
+      <button class="create-link">
+        <span class="create-link__plus">+</span> New client
+      </button>
+
+      <!-- Section: Recent -->
+      <div class="drawer-section" style="margin-top: 8px;">Recent</div>
+
+      <div class="workflow-row">
+        <span class="workflow-dot workflow-dot--idle"></span>
+        <span class="workflow-row__name">Smart Glasses UX Sprint</span>
+        <span class="workflow-row__time">3h</span>
+      </div>
+      <div class="workflow-row">
+        <span class="workflow-dot workflow-dot--idle"></span>
+        <span class="workflow-row__name">DB Schema Migration v4</span>
+        <span class="workflow-row__time">1d</span>
+      </div>
+      <div class="workflow-row">
+        <span class="workflow-dot workflow-dot--idle"></span>
+        <span class="workflow-row__name">CI Pipeline Optimization</span>
+        <span class="workflow-row__time">3d</span>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

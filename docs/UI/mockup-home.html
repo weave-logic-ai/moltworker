@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Clawdflare Bridge - Home</title>
+<style>
+/* ============================================================
+   Design Tokens - Track Changelog Aesthetic
+   ============================================================ */
+:root {
+  --bg: #09090b;
+  --card: transparent;
+  --card-hover: rgba(255,255,255,0.03);
+  --border: rgba(255,255,255,0.06);
+  --border-strong: rgba(255,255,255,0.12);
+  --text: #fafafa;
+  --text-muted: #71717a;
+  --text-subtle: #52525b;
+  --accent: #e94560;
+  --success: #4ecca3;
+  --warning: #f59e0b;
+  --destructive: #ef4444;
+  --info: #5b8def;
+  --radius: 12px;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+  height: 100%;
+}
+
+body {
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ============================================================
+   App Shell
+   ============================================================ */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-width: 428px;
+  margin: 0 auto;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+/* ============================================================
+   Edge Handles
+   ============================================================ */
+.edge-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  z-index: 100;
+  cursor: grab;
+}
+.edge-handle--left {
+  left: 0;
+  background: rgba(255,255,255,0.04);
+}
+.edge-handle--right {
+  right: 0;
+  background: rgba(255,255,255,0.04);
+}
+.edge-handle .notch {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 32px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.1);
+}
+.edge-handle--left .notch { left: 0; }
+.edge-handle--right .notch { right: 0; }
+
+/* ============================================================
+   Status Bar
+   ============================================================ */
+.status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.status-bar__left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.status-dot--green { background: var(--success); }
+.status-dot--amber { background: var(--warning); }
+.status-bar__time {
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+
+/* ============================================================
+   Content Area
+   ============================================================ */
+.content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0 20px 100px;
+  -webkit-overflow-scrolling: touch;
+}
+.content::-webkit-scrollbar { display: none; }
+
+/* ============================================================
+   Greeting
+   ============================================================ */
+.greeting {
+  padding: 24px 0 32px;
+}
+.greeting__row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.greeting__avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), #a855f7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 600;
+  color: white;
+  flex-shrink: 0;
+  position: relative;
+}
+.greeting__avatar-status {
+  position: absolute;
+  bottom: 1px;
+  right: 1px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--success);
+  border: 2px solid var(--bg);
+}
+.greeting__text h1 {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  line-height: 1.2;
+}
+.greeting__text p {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* ============================================================
+   Section Headers
+   ============================================================ */
+.section-label {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--text-subtle);
+  margin-bottom: 16px;
+}
+
+/* ============================================================
+   Active Workflows (flowing list)
+   ============================================================ */
+.workflows {
+  margin-bottom: 32px;
+}
+.workflow-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 200ms ease;
+  margin: 0 -20px;
+  padding-left: 20px;
+  padding-right: 20px;
+}
+.workflow-item:last-child {
+  border-bottom: none;
+}
+.workflow-item:active {
+  background: var(--card-hover);
+}
+.workflow-item__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.workflow-item__dot--active {
+  background: var(--success);
+  box-shadow: 0 0 8px rgba(78, 204, 163, 0.4);
+}
+.workflow-item__dot--pending {
+  background: var(--warning);
+}
+.workflow-item__dot--idle {
+  background: var(--text-subtle);
+}
+.workflow-item__body {
+  flex: 1;
+  min-width: 0;
+}
+.workflow-item__name {
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.workflow-item__meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 1px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.workflow-item__meta span {
+  white-space: nowrap;
+}
+.workflow-item__meta .separator {
+  color: var(--text-subtle);
+}
+.workflow-item__arrow {
+  color: var(--text-subtle);
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   Quick Actions (horizontal scroll pills)
+   ============================================================ */
+.quick-actions {
+  margin-bottom: 32px;
+}
+.pills {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin: 0 -20px;
+  padding-left: 20px;
+  padding-right: 20px;
+  -webkit-overflow-scrolling: touch;
+}
+.pills::-webkit-scrollbar { display: none; }
+.pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  font-size: 13px;
+  font-weight: 450;
+  color: var(--text);
+  white-space: nowrap;
+  transition: all 150ms ease;
+  flex-shrink: 0;
+}
+.pill:active {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.2);
+}
+.pill__icon {
+  font-size: 14px;
+  opacity: 0.7;
+}
+
+/* ============================================================
+   Notifications (inline feed with left border)
+   ============================================================ */
+.notifications {
+  margin-bottom: 32px;
+}
+.notif-item {
+  padding: 12px 0 12px 14px;
+  border-left: 2px solid var(--border);
+  margin-bottom: 2px;
+  position: relative;
+}
+.notif-item--critical {
+  border-left-color: var(--destructive);
+}
+.notif-item--warning {
+  border-left-color: var(--warning);
+}
+.notif-item--info {
+  border-left-color: var(--info);
+}
+.notif-item--success {
+  border-left-color: var(--success);
+}
+.notif-item__title {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.notif-item__detail {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.notif-item__time {
+  font-size: 11px;
+  color: var(--text-subtle);
+  font-family: var(--font-mono);
+  margin-top: 4px;
+}
+
+/* ============================================================
+   System Pulse (inline status bar)
+   ============================================================ */
+.system-pulse {
+  margin-bottom: 32px;
+}
+.pulse-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 0;
+}
+.pulse-service {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  letter-spacing: 0.3px;
+}
+.pulse-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
+.pulse-dot--ok { background: var(--success); }
+.pulse-dot--warn { background: var(--warning); }
+.pulse-dot--err { background: var(--destructive); }
+
+/* ============================================================
+   Bottom Bar
+   ============================================================ */
+.bottom-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 8px 0 calc(8px + var(--safe-bottom));
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  z-index: 90;
+}
+.bottom-bar__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 12px;
+  font-size: 10px;
+  color: var(--text-subtle);
+  letter-spacing: 0.3px;
+  transition: color 150ms ease;
+}
+.bottom-bar__item--active {
+  color: var(--text);
+}
+.bottom-bar__icon {
+  font-size: 18px;
+  line-height: 1;
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Edge Handles -->
+  <div class="edge-handle edge-handle--left"><div class="notch"></div></div>
+  <div class="edge-handle edge-handle--right"><div class="notch"></div></div>
+
+  <!-- Status Bar -->
+  <div class="status-bar">
+    <div class="status-bar__left">
+      <span class="status-dot status-dot--green"></span>
+      <span class="status-dot status-dot--green"></span>
+      <span class="status-dot status-dot--amber"></span>
+    </div>
+    <span class="status-bar__time">9:42 PM</span>
+  </div>
+
+  <!-- Scrollable Content -->
+  <div class="content">
+
+    <!-- Greeting -->
+    <div class="greeting">
+      <div class="greeting__row">
+        <div class="greeting__avatar">
+          A
+          <span class="greeting__avatar-status"></span>
+        </div>
+        <div class="greeting__text">
+          <h1>Good evening, Adrian</h1>
+          <p>3 workflows active &middot; 1 needs attention</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Active Workflows -->
+    <div class="workflows">
+      <div class="section-label">Active Workflows</div>
+
+      <div class="workflow-item">
+        <span class="workflow-item__dot workflow-item__dot--active"></span>
+        <div class="workflow-item__body">
+          <div class="workflow-item__name">Auth Service Refactor</div>
+          <div class="workflow-item__meta">
+            <span>MentraOS Core</span>
+            <span class="separator">/</span>
+            <span>2m ago</span>
+          </div>
+        </div>
+        <span class="workflow-item__arrow">&rsaquo;</span>
+      </div>
+
+      <div class="workflow-item">
+        <span class="workflow-item__dot workflow-item__dot--active"></span>
+        <div class="workflow-item__body">
+          <div class="workflow-item__name">Container Deploy Pipeline</div>
+          <div class="workflow-item__meta">
+            <span>Clawdflare Infra</span>
+            <span class="separator">/</span>
+            <span>8m ago</span>
+          </div>
+        </div>
+        <span class="workflow-item__arrow">&rsaquo;</span>
+      </div>
+
+      <div class="workflow-item">
+        <span class="workflow-item__dot workflow-item__dot--pending"></span>
+        <div class="workflow-item__body">
+          <div class="workflow-item__name">API Gateway Rate Limiting</div>
+          <div class="workflow-item__meta">
+            <span>WeaveLogic Bridge</span>
+            <span class="separator">/</span>
+            <span>Awaiting review</span>
+          </div>
+        </div>
+        <span class="workflow-item__arrow">&rsaquo;</span>
+      </div>
+
+      <div class="workflow-item">
+        <span class="workflow-item__dot workflow-item__dot--idle"></span>
+        <div class="workflow-item__body">
+          <div class="workflow-item__name">Smart Glasses UX Sprint</div>
+          <div class="workflow-item__meta">
+            <span>XR Lab</span>
+            <span class="separator">/</span>
+            <span>Paused &middot; 3h ago</span>
+          </div>
+        </div>
+        <span class="workflow-item__arrow">&rsaquo;</span>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="quick-actions">
+      <div class="section-label">Quick Actions</div>
+      <div class="pills">
+        <button class="pill">
+          <span class="pill__icon">+</span>
+          New Workflow
+        </button>
+        <button class="pill">
+          <span class="pill__icon">&varr;</span>
+          Deploy
+        </button>
+        <button class="pill">
+          <span class="pill__icon">&oplus;</span>
+          Spawn Agent
+        </button>
+        <button class="pill">
+          <span class="pill__icon">&phone;</span>
+          Call
+        </button>
+        <button class="pill">
+          <span class="pill__icon">&square;</span>
+          Snapshot
+        </button>
+      </div>
+    </div>
+
+    <!-- Notifications -->
+    <div class="notifications">
+      <div class="section-label">Notifications</div>
+
+      <div class="notif-item notif-item--critical">
+        <div class="notif-item__title">Deploy failed on staging</div>
+        <div class="notif-item__detail">Container health check timeout after 30s &mdash; memory limit exceeded</div>
+        <div class="notif-item__time">2 min ago</div>
+      </div>
+
+      <div class="notif-item notif-item--warning">
+        <div class="notif-item__title">PR #312 needs your review</div>
+        <div class="notif-item__detail">Auth middleware changes &mdash; 4 files, +127 -34</div>
+        <div class="notif-item__time">18 min ago</div>
+      </div>
+
+      <div class="notif-item notif-item--success">
+        <div class="notif-item__title">Worker swarm completed</div>
+        <div class="notif-item__detail">8/8 agents finished &mdash; all tests passing</div>
+        <div class="notif-item__time">1h ago</div>
+      </div>
+
+      <div class="notif-item notif-item--info">
+        <div class="notif-item__title">Scheduled backup complete</div>
+        <div class="notif-item__detail">AgentDB snapshot &mdash; 2.4 GB compressed</div>
+        <div class="notif-item__time">3h ago</div>
+      </div>
+    </div>
+
+    <!-- System Pulse -->
+    <div class="system-pulse">
+      <div class="section-label">System Pulse</div>
+      <div class="pulse-row">
+        <div class="pulse-service">
+          <span class="pulse-dot pulse-dot--ok"></span>
+          workers
+        </div>
+        <div class="pulse-service">
+          <span class="pulse-dot pulse-dot--ok"></span>
+          agentdb
+        </div>
+        <div class="pulse-service">
+          <span class="pulse-dot pulse-dot--ok"></span>
+          gateway
+        </div>
+        <div class="pulse-service">
+          <span class="pulse-dot pulse-dot--warn"></span>
+          containers
+        </div>
+        <div class="pulse-service">
+          <span class="pulse-dot pulse-dot--ok"></span>
+          hive
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Bottom Bar -->
+  <div class="bottom-bar">
+    <button class="bottom-bar__item bottom-bar__item--active">
+      <span class="bottom-bar__icon">&equiv;</span>
+      Chat
+    </button>
+    <button class="bottom-bar__item">
+      <span class="bottom-bar__icon">&oplus;</span>
+      Comms
+    </button>
+    <button class="bottom-bar__item">
+      <span class="bottom-bar__icon">&loz;</span>
+      Admin
+    </button>
+    <button class="bottom-bar__item">
+      <span class="bottom-bar__icon">&bull;</span>
+      Settings
+    </button>
+  </div>
+
+</div>
+</body>
+</html>
