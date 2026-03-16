@@ -9,7 +9,7 @@ gcp_zone         = "us-east1-b"
 gcp_machine_type = "e2-medium"
 
 # Networking
-domain           = "pod.aebots.com"
+domain           = "aebots.org"
 ssh_allowed_ips  = ["203.0.113.0/32"]  # Your IP
 
 # Monitoring (optional)

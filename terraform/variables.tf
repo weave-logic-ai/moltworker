@@ -29,9 +29,9 @@ variable "gcp_machine_type" {
 # --- Networking ---
 
 variable "domain" {
-  description = "Base domain for services (e.g., pod.aebots.com)"
+  description = "Base domain for services (e.g., aebots.org)"
   type        = string
-  default     = "pod.aebots.com"
+  default     = "aebots.org"
 }
 
 variable "ssh_allowed_ips" {
