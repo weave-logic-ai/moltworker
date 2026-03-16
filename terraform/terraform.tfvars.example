@@ -1,0 +1,20 @@
+# terraform/terraform.tfvars.example
+# Copy to terraform.tfvars and fill in real values.
+# NEVER commit terraform.tfvars — it contains secrets.
+
+# GCP
+gcp_project_id  = "my-gcp-project-id"
+gcp_region      = "us-east1"
+gcp_zone        = "us-east1-b"
+gcp_machine_type = "e2-medium"
+
+# Cloudflare
+cloudflare_api_token  = "your-cloudflare-api-token"
+cloudflare_account_id = "your-cloudflare-account-id"
+cloudflare_zone_id    = "your-cloudflare-zone-id"
+domain                = "example.com"
+tunnel_secret         = "base64-encoded-32-byte-secret"
+
+# Access control
+ssh_allowed_ips = ["203.0.113.0/32"]  # Your IP
+allowed_emails  = ["you@example.com"]

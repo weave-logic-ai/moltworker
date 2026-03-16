@@ -1,0 +1,32 @@
+# .github/workflows/deploy-gcp.yml
+# Deploy to GCP VM via SSH when relevant files change on main.
+
+name: Deploy to GCP
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'skills/mentra-bridge/**'
+      - 'scripts/**'
+      - 'config/**'
+      - 'ecosystem.config.js'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to VM
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.GCP_VM_IP }}
+          username: deploy
+          key: ${{ secrets.GCP_SSH_KEY }}
+          script: |
+            cd /opt/moltworker
+            git pull origin main
+            npm install
+            pm2 restart ecosystem.config.js
+            pm2 save
