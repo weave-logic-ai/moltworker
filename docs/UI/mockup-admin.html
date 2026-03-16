@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Clawdflare Bridge - Admin</title>
+<style>
+/* ============================================================
+   Design Tokens
+   ============================================================ */
+:root {
+  --bg: #09090b;
+  --card-hover: rgba(255,255,255,0.03);
+  --border: rgba(255,255,255,0.06);
+  --border-strong: rgba(255,255,255,0.12);
+  --text: #fafafa;
+  --text-muted: #71717a;
+  --text-subtle: #52525b;
+  --accent: #e94560;
+  --success: #4ecca3;
+  --warning: #f59e0b;
+  --destructive: #ef4444;
+  --info: #5b8def;
+  --radius: 12px;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  height: 100%;
+}
+
+body { height: 100%; overflow: hidden; display: flex; flex-direction: column; }
+
+button {
+  font-family: inherit; font-size: inherit; cursor: pointer;
+  border: none; background: none; color: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ============================================================
+   App Shell
+   ============================================================ */
+.app {
+  display: flex; flex-direction: column; height: 100%;
+  max-width: 428px; margin: 0 auto; width: 100%;
+  position: relative; overflow: hidden; background: var(--bg);
+}
+
+/* Edge Handles */
+.edge-handle {
+  position: absolute; top: 0; bottom: 0; width: 2px; z-index: 100; cursor: grab;
+}
+.edge-handle--left { left: 0; background: rgba(255,255,255,0.04); }
+.edge-handle--right { right: 0; background: rgba(255,255,255,0.04); }
+.edge-handle .notch {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 4px; height: 32px; border-radius: 2px; background: rgba(255,255,255,0.1);
+}
+.edge-handle--left .notch { left: 0; }
+.edge-handle--right .notch { right: 0; }
+
+/* ============================================================
+   Header
+   ============================================================ */
+.header {
+  padding: 14px 20px 0;
+  flex-shrink: 0;
+}
+.header__title {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  margin-bottom: 8px;
+}
+
+/* ============================================================
+   Content Area
+   ============================================================ */
+.content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0 0 80px;
+  -webkit-overflow-scrolling: touch;
+}
+.content::-webkit-scrollbar { display: none; }
+
+/* ============================================================
+   Section Labels
+   ============================================================ */
+.section-label {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--text-subtle);
+  padding: 24px 20px 12px;
+}
+
+/* ============================================================
+   Services Row (horizontal status indicators)
+   ============================================================ */
+.services-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  padding: 0 20px 20px;
+}
+.service-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.service-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.service-dot--ok { background: var(--success); }
+.service-dot--warn { background: var(--warning); }
+.service-dot--err { background: var(--destructive); }
+.service-dot--ok-glow {
+  background: var(--success);
+  box-shadow: 0 0 6px rgba(78, 204, 163, 0.4);
+}
+
+/* ============================================================
+   Quick Actions (pill buttons)
+   ============================================================ */
+.action-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 20px 24px;
+}
+.action-pill {
+  padding: 7px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  font-size: 13px;
+  font-weight: 450;
+  color: var(--text);
+  transition: all 150ms ease;
+}
+.action-pill:active {
+  background: rgba(255,255,255,0.06);
+}
+
+/* ============================================================
+   Health Bars
+   ============================================================ */
+.health-section {
+  padding: 0 20px 24px;
+}
+.health-item {
+  margin-bottom: 14px;
+}
+.health-item:last-child {
+  margin-bottom: 0;
+}
+.health-item__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 6px;
+}
+.health-item__label {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.health-item__value {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text);
+}
+.health-item__value--warn { color: var(--warning); }
+.health-item__value--ok { color: var(--success); }
+.health-bar {
+  width: 100%;
+  height: 4px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.health-bar__fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 500ms ease;
+}
+.health-bar__fill--ok { background: var(--success); }
+.health-bar__fill--warn { background: var(--warning); }
+.health-bar__fill--critical { background: var(--destructive); }
+
+/* ============================================================
+   Deploy List (changelog style)
+   ============================================================ */
+.deploy-list {
+  padding: 0 20px 24px;
+}
+.deploy-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.deploy-item:last-child {
+  border-bottom: none;
+}
+.deploy-status {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.deploy-status--success { color: var(--success); }
+.deploy-status--failed { color: var(--destructive); }
+.deploy-status--pending { color: var(--warning); }
+.deploy-status--building {
+  color: var(--info);
+  animation: deploy-spin 1.5s linear infinite;
+}
+@keyframes deploy-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.deploy-item__body {
+  flex: 1;
+  min-width: 0;
+}
+.deploy-item__name {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.deploy-item__meta {
+  font-size: 11px;
+  color: var(--text-subtle);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 1px;
+}
+.deploy-env {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  padding: 1px 6px;
+  border-radius: 999px;
+  letter-spacing: 0.3px;
+}
+.deploy-env--prod {
+  background: rgba(233, 69, 96, 0.1);
+  color: var(--accent);
+}
+.deploy-env--staging {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--warning);
+}
+.deploy-env--dev {
+  background: rgba(255,255,255,0.06);
+  color: var(--text-muted);
+}
+.deploy-item__time {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-subtle);
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   Danger Zone
+   ============================================================ */
+.danger-zone {
+  padding: 0 20px 32px;
+}
+.danger-btn {
+  padding: 8px 0;
+  font-size: 13px;
+  color: var(--destructive);
+  display: block;
+  width: 100%;
+  text-align: left;
+  opacity: 0.8;
+  transition: opacity 150ms ease;
+}
+.danger-btn:active {
+  opacity: 1;
+}
+.danger-divider {
+  height: 1px;
+  background: rgba(239, 68, 68, 0.1);
+  margin: 4px 0;
+}
+
+/* ============================================================
+   Confirmation Dialog
+   ============================================================ */
+.dialog-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.dialog {
+  background: #18181b;
+  border-radius: var(--radius);
+  padding: 24px;
+  width: 100%;
+  max-width: 340px;
+  border: 1px solid var(--border-strong);
+}
+.dialog__title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.dialog__desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+.dialog__actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+.dialog__btn {
+  padding: 8px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.dialog__btn--cancel {
+  color: var(--text-muted);
+  border: 1px solid var(--border-strong);
+}
+.dialog__btn--confirm {
+  background: var(--destructive);
+  color: white;
+}
+
+/* ============================================================
+   Bottom Bar
+   ============================================================ */
+.bottom-bar {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  display: flex; justify-content: space-around; align-items: center;
+  padding: 8px 0 calc(8px + var(--safe-bottom));
+  background: var(--bg); border-top: 1px solid var(--border); z-index: 90;
+}
+.bottom-bar__item {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 4px 12px; font-size: 10px; color: var(--text-subtle);
+  letter-spacing: 0.3px; transition: color 150ms ease;
+}
+.bottom-bar__item--active { color: var(--text); }
+.bottom-bar__icon { font-size: 18px; line-height: 1; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Edge Handles -->
+  <div class="edge-handle edge-handle--left"><div class="notch"></div></div>
+  <div class="edge-handle edge-handle--right"><div class="notch"></div></div>
+
+  <!-- Header -->
+  <div class="header">
+    <h1 class="header__title">Admin</h1>
+  </div>
+
+  <!-- Content -->
+  <div class="content">
+
+    <!-- Services -->
+    <div class="section-label">Services</div>
+    <div class="services-row">
+      <div class="service-indicator">
+        <span class="service-dot service-dot--ok-glow"></span>
+        Workers
+      </div>
+      <div class="service-indicator">
+        <span class="service-dot service-dot--ok"></span>
+        AgentDB
+      </div>
+      <div class="service-indicator">
+        <span class="service-dot service-dot--ok"></span>
+        Gateway
+      </div>
+      <div class="service-indicator">
+        <span class="service-dot service-dot--warn"></span>
+        Containers
+      </div>
+      <div class="service-indicator">
+        <span class="service-dot service-dot--ok"></span>
+        Hive Mind
+      </div>
+      <div class="service-indicator">
+        <span class="service-dot service-dot--ok"></span>
+        CDN
+      </div>
+      <div class="service-indicator">
+        <span class="service-dot service-dot--ok"></span>
+        DNS
+      </div>
+      <div class="service-indicator">
+        <span class="service-dot service-dot--err"></span>
+        Staging
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="section-label">Quick Actions</div>
+    <div class="action-pills">
+      <button class="action-pill">Restart workers</button>
+      <button class="action-pill">Clear cache</button>
+      <button class="action-pill">Run health check</button>
+      <button class="action-pill">Sync agents</button>
+      <button class="action-pill">Rotate keys</button>
+    </div>
+
+    <!-- Health -->
+    <div class="section-label">Health</div>
+    <div class="health-section">
+      <div class="health-item">
+        <div class="health-item__top">
+          <span class="health-item__label">CPU Utilization</span>
+          <span class="health-item__value health-item__value--ok">34%</span>
+        </div>
+        <div class="health-bar">
+          <div class="health-bar__fill health-bar__fill--ok" style="width: 34%"></div>
+        </div>
+      </div>
+      <div class="health-item">
+        <div class="health-item__top">
+          <span class="health-item__label">Memory</span>
+          <span class="health-item__value health-item__value--warn">1.8 / 2.0 GB</span>
+        </div>
+        <div class="health-bar">
+          <div class="health-bar__fill health-bar__fill--warn" style="width: 90%"></div>
+        </div>
+      </div>
+      <div class="health-item">
+        <div class="health-item__top">
+          <span class="health-item__label">Disk</span>
+          <span class="health-item__value">62%</span>
+        </div>
+        <div class="health-bar">
+          <div class="health-bar__fill health-bar__fill--ok" style="width: 62%"></div>
+        </div>
+      </div>
+      <div class="health-item">
+        <div class="health-item__top">
+          <span class="health-item__label">Request latency (p99)</span>
+          <span class="health-item__value health-item__value--ok">142ms</span>
+        </div>
+        <div class="health-bar">
+          <div class="health-bar__fill health-bar__fill--ok" style="width: 28%"></div>
+        </div>
+      </div>
+      <div class="health-item">
+        <div class="health-item__top">
+          <span class="health-item__label">Error rate</span>
+          <span class="health-item__value health-item__value--ok">0.2%</span>
+        </div>
+        <div class="health-bar">
+          <div class="health-bar__fill health-bar__fill--ok" style="width: 2%"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent Deploys -->
+    <div class="section-label">Recent Deploys</div>
+    <div class="deploy-list">
+
+      <div class="deploy-item">
+        <span class="deploy-status deploy-status--building">&#x25cb;</span>
+        <div class="deploy-item__body">
+          <div class="deploy-item__name">auth-service v2.4.1</div>
+          <div class="deploy-item__meta">
+            <span class="deploy-env deploy-env--staging">staging</span>
+            <span>Building...</span>
+          </div>
+        </div>
+        <span class="deploy-item__time">now</span>
+      </div>
+
+      <div class="deploy-item">
+        <span class="deploy-status deploy-status--failed">&#x2717;</span>
+        <div class="deploy-item__body">
+          <div class="deploy-item__name">worker-container v3.1.0</div>
+          <div class="deploy-item__meta">
+            <span class="deploy-env deploy-env--staging">staging</span>
+            <span>Health check timeout</span>
+          </div>
+        </div>
+        <span class="deploy-item__time">18m</span>
+      </div>
+
+      <div class="deploy-item">
+        <span class="deploy-status deploy-status--success">&#x2713;</span>
+        <div class="deploy-item__body">
+          <div class="deploy-item__name">gateway-proxy v1.8.3</div>
+          <div class="deploy-item__meta">
+            <span class="deploy-env deploy-env--prod">prod</span>
+            <span>Deployed successfully</span>
+          </div>
+        </div>
+        <span class="deploy-item__time">2h</span>
+      </div>
+
+      <div class="deploy-item">
+        <span class="deploy-status deploy-status--success">&#x2713;</span>
+        <div class="deploy-item__body">
+          <div class="deploy-item__name">agentdb v4.2.0</div>
+          <div class="deploy-item__meta">
+            <span class="deploy-env deploy-env--prod">prod</span>
+            <span>Deployed successfully</span>
+          </div>
+        </div>
+        <span class="deploy-item__time">6h</span>
+      </div>
+
+      <div class="deploy-item">
+        <span class="deploy-status deploy-status--success">&#x2713;</span>
+        <div class="deploy-item__body">
+          <div class="deploy-item__name">docs-site v2.1.0</div>
+          <div class="deploy-item__meta">
+            <span class="deploy-env deploy-env--dev">dev</span>
+            <span>Preview deployed</span>
+          </div>
+        </div>
+        <span class="deploy-item__time">1d</span>
+      </div>
+
+      <div class="deploy-item">
+        <span class="deploy-status deploy-status--success">&#x2713;</span>
+        <div class="deploy-item__body">
+          <div class="deploy-item__name">hive-mind v1.3.2</div>
+          <div class="deploy-item__meta">
+            <span class="deploy-env deploy-env--prod">prod</span>
+            <span>Deployed successfully</span>
+          </div>
+        </div>
+        <span class="deploy-item__time">2d</span>
+      </div>
+
+    </div>
+
+    <!-- Danger Zone -->
+    <div class="section-label" style="color: rgba(239, 68, 68, 0.6);">Danger Zone</div>
+    <div class="danger-zone">
+      <button class="danger-btn">Purge all caches</button>
+      <div class="danger-divider"></div>
+      <button class="danger-btn">Force restart all workers</button>
+      <div class="danger-divider"></div>
+      <button class="danger-btn">Reset agent memory</button>
+      <div class="danger-divider"></div>
+      <button class="danger-btn">Rollback last deploy</button>
+    </div>
+
+  </div>
+
+  <!-- Confirmation Dialog (shown for illustration) -->
+  <div class="dialog-overlay" style="display: none;">
+    <div class="dialog">
+      <div class="dialog__title">Purge all caches?</div>
+      <div class="dialog__desc">
+        This will clear all CDN, worker, and AgentDB caches across all regions. Active sessions may experience increased latency for 2-5 minutes.
+      </div>
+      <div class="dialog__actions">
+        <button class="dialog__btn dialog__btn--cancel">Cancel</button>
+        <button class="dialog__btn dialog__btn--confirm">Purge</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Bar -->
+  <div class="bottom-bar">
+    <button class="bottom-bar__item">
+      <span class="bottom-bar__icon">&equiv;</span>
+      Chat
+    </button>
+    <button class="bottom-bar__item">
+      <span class="bottom-bar__icon">&oplus;</span>
+      Comms
+    </button>
+    <button class="bottom-bar__item bottom-bar__item--active">
+      <span class="bottom-bar__icon">&loz;</span>
+      Admin
+    </button>
+    <button class="bottom-bar__item">
+      <span class="bottom-bar__icon">&bull;</span>
+      Settings
+    </button>
+  </div>
+
+</div>
+</body>
+</html>

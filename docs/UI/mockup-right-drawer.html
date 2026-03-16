@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Clawdflare Bridge - Debug Tools</title>
+<style>
+/* ============================================================
+   Design Tokens
+   ============================================================ */
+:root {
+  --bg: #09090b;
+  --drawer-bg: #0c0c0f;
+  --card-hover: rgba(255,255,255,0.03);
+  --border: rgba(255,255,255,0.06);
+  --border-strong: rgba(255,255,255,0.12);
+  --text: #fafafa;
+  --text-muted: #71717a;
+  --text-subtle: #52525b;
+  --accent: #e94560;
+  --success: #4ecca3;
+  --warning: #f59e0b;
+  --destructive: #ef4444;
+  --radius: 12px;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  height: 100%;
+}
+
+body { height: 100%; overflow: hidden; display: flex; flex-direction: column; }
+
+button {
+  font-family: inherit; font-size: inherit; cursor: pointer;
+  border: none; background: none; color: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ============================================================
+   App Shell
+   ============================================================ */
+.app {
+  display: flex; flex-direction: column; height: 100%;
+  max-width: 428px; margin: 0 auto; width: 100%;
+  position: relative; overflow: hidden; background: var(--bg);
+}
+
+/* Backdrop */
+.drawer-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 200;
+}
+
+/* Drawer (right side) */
+.drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 80%;
+  background: var(--drawer-bg);
+  z-index: 210;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ============================================================
+   Drawer Header
+   ============================================================ */
+.drawer-header {
+  padding: 16px 20px 12px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.drawer-header__title {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+}
+.drawer-header__close {
+  font-size: 20px;
+  color: var(--text-subtle);
+  padding: 4px;
+}
+
+/* ============================================================
+   Scrollable Content
+   ============================================================ */
+.drawer-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 0 calc(20px + var(--safe-bottom));
+  -webkit-overflow-scrolling: touch;
+}
+.drawer-content::-webkit-scrollbar { display: none; }
+
+/* ============================================================
+   Collapsible Section
+   ============================================================ */
+.debug-section {
+  border-bottom: 1px solid var(--border);
+}
+.debug-section__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+.debug-section__header:active {
+  background: var(--card-hover);
+}
+.debug-section__title {
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-muted);
+}
+.debug-section__toggle {
+  font-size: 12px;
+  color: var(--text-subtle);
+  transition: transform 200ms ease;
+}
+.debug-section--open .debug-section__toggle {
+  transform: rotate(90deg);
+}
+.debug-section__body {
+  padding: 0 20px 16px;
+}
+
+/* ============================================================
+   Data Pairs
+   ============================================================ */
+.data-pair {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 5px 0;
+}
+.data-pair__label {
+  font-size: 12px;
+  color: var(--text-subtle);
+}
+.data-pair__value {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text);
+  text-align: right;
+}
+.data-pair__value--success { color: var(--success); }
+.data-pair__value--warning { color: var(--warning); }
+.data-pair__value--error { color: var(--destructive); }
+.data-pair__value--accent { color: var(--accent); }
+
+/* ============================================================
+   Mini Progress Bar
+   ============================================================ */
+.mini-bar {
+  margin-top: 4px;
+}
+.mini-bar__track {
+  width: 100%;
+  height: 3px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.mini-bar__fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 300ms ease;
+}
+.mini-bar__fill--ok { background: var(--success); }
+.mini-bar__fill--warn { background: var(--warning); }
+.mini-bar__fill--critical { background: var(--destructive); }
+
+/* ============================================================
+   Agent List
+   ============================================================ */
+.agent-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+}
+.agent-item__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.agent-item__dot--active { background: var(--success); }
+.agent-item__dot--idle { background: var(--text-subtle); }
+.agent-item__dot--busy { background: var(--warning); }
+.agent-item__name {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: rgba(250,250,250,0.8);
+  flex: 1;
+}
+.agent-item__status {
+  font-size: 11px;
+  color: var(--text-subtle);
+}
+
+/* ============================================================
+   Waveform Animation
+   ============================================================ */
+.waveform {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 20px;
+  padding: 6px 0;
+}
+.waveform__bar {
+  width: 2px;
+  background: var(--accent);
+  border-radius: 1px;
+  opacity: 0.6;
+  animation: waveform-pulse 1.2s ease-in-out infinite;
+}
+.waveform__bar:nth-child(1) { height: 6px; animation-delay: 0s; }
+.waveform__bar:nth-child(2) { height: 12px; animation-delay: 0.1s; }
+.waveform__bar:nth-child(3) { height: 8px; animation-delay: 0.2s; }
+.waveform__bar:nth-child(4) { height: 16px; animation-delay: 0.3s; }
+.waveform__bar:nth-child(5) { height: 10px; animation-delay: 0.4s; }
+.waveform__bar:nth-child(6) { height: 14px; animation-delay: 0.5s; }
+.waveform__bar:nth-child(7) { height: 6px; animation-delay: 0.6s; }
+.waveform__bar:nth-child(8) { height: 10px; animation-delay: 0.7s; }
+
+@keyframes waveform-pulse {
+  0%, 100% { transform: scaleY(0.5); opacity: 0.4; }
+  50% { transform: scaleY(1); opacity: 0.8; }
+}
+
+/* ============================================================
+   Battery Indicator
+   ============================================================ */
+.battery {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.battery__icon {
+  width: 24px;
+  height: 12px;
+  border: 1px solid var(--text-subtle);
+  border-radius: 2px;
+  position: relative;
+  padding: 1px;
+}
+.battery__icon::after {
+  content: '';
+  position: absolute;
+  right: -4px;
+  top: 3px;
+  width: 2px;
+  height: 4px;
+  background: var(--text-subtle);
+  border-radius: 0 1px 1px 0;
+}
+.battery__fill {
+  height: 100%;
+  border-radius: 1px;
+}
+.battery__fill--ok { background: var(--success); width: 78%; }
+.battery__text {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+/* ============================================================
+   Log lines
+   ============================================================ */
+.log-line {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-subtle);
+  padding: 2px 0;
+  line-height: 1.5;
+}
+.log-line__time {
+  color: var(--text-subtle);
+  margin-right: 6px;
+}
+.log-line__msg { color: rgba(250,250,250,0.6); }
+.log-line__msg--err { color: var(--destructive); }
+.log-line__msg--warn { color: var(--warning); }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Backdrop -->
+  <div class="drawer-backdrop"></div>
+
+  <!-- Right Drawer -->
+  <div class="drawer">
+
+    <!-- Header -->
+    <div class="drawer-header">
+      <span class="drawer-header__title">Debug</span>
+      <button class="drawer-header__close">&times;</button>
+    </div>
+
+    <!-- Content -->
+    <div class="drawer-content">
+
+      <!-- Section: System -->
+      <div class="debug-section debug-section--open">
+        <div class="debug-section__header">
+          <span class="debug-section__title">System</span>
+          <span class="debug-section__toggle">&rsaquo;</span>
+        </div>
+        <div class="debug-section__body">
+          <div class="data-pair">
+            <span class="data-pair__label">Uptime</span>
+            <span class="data-pair__value">4d 7h 23m</span>
+          </div>
+          <div class="data-pair">
+            <span class="data-pair__label">Memory</span>
+            <span class="data-pair__value data-pair__value--warning">1.8 / 2.0 GB</span>
+          </div>
+          <div class="mini-bar">
+            <div class="mini-bar__track">
+              <div class="mini-bar__fill mini-bar__fill--warn" style="width: 90%"></div>
+            </div>
+          </div>
+          <div class="data-pair" style="margin-top: 4px;">
+            <span class="data-pair__label">CPU</span>
+            <span class="data-pair__value">34%</span>
+          </div>
+          <div class="mini-bar">
+            <div class="mini-bar__track">
+              <div class="mini-bar__fill mini-bar__fill--ok" style="width: 34%"></div>
+            </div>
+          </div>
+          <div class="data-pair" style="margin-top: 4px;">
+            <span class="data-pair__label">Disk</span>
+            <span class="data-pair__value">62%</span>
+          </div>
+          <div class="mini-bar">
+            <div class="mini-bar__track">
+              <div class="mini-bar__fill mini-bar__fill--ok" style="width: 62%"></div>
+            </div>
+          </div>
+          <div class="data-pair" style="margin-top: 8px;">
+            <span class="data-pair__label">Battery</span>
+            <span class="battery">
+              <span class="battery__icon"><span class="battery__fill battery__fill--ok"></span></span>
+              <span class="battery__text">78%</span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section: Active Agents -->
+      <div class="debug-section debug-section--open">
+        <div class="debug-section__header">
+          <span class="debug-section__title">Active Agents</span>
+          <span class="debug-section__toggle">&rsaquo;</span>
+        </div>
+        <div class="debug-section__body">
+          <div class="agent-item">
+            <span class="agent-item__dot agent-item__dot--active"></span>
+            <span class="agent-item__name">coder-alpha</span>
+            <span class="agent-item__status">writing</span>
+          </div>
+          <div class="agent-item">
+            <span class="agent-item__dot agent-item__dot--busy"></span>
+            <span class="agent-item__name">scout-recon</span>
+            <span class="agent-item__status">scanning</span>
+          </div>
+          <div class="agent-item">
+            <span class="agent-item__dot agent-item__dot--active"></span>
+            <span class="agent-item__name">reviewer-sec</span>
+            <span class="agent-item__status">waiting</span>
+          </div>
+          <div class="agent-item">
+            <span class="agent-item__dot agent-item__dot--active"></span>
+            <span class="agent-item__name">worker-3</span>
+            <span class="agent-item__status">thinking</span>
+          </div>
+          <div class="agent-item">
+            <span class="agent-item__dot agent-item__dot--idle"></span>
+            <span class="agent-item__name">worker-4</span>
+            <span class="agent-item__status">idle</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section: Network -->
+      <div class="debug-section debug-section--open">
+        <div class="debug-section__header">
+          <span class="debug-section__title">Network</span>
+          <span class="debug-section__toggle">&rsaquo;</span>
+        </div>
+        <div class="debug-section__body">
+          <div class="data-pair">
+            <span class="data-pair__label">Latency</span>
+            <span class="data-pair__value data-pair__value--success">23ms</span>
+          </div>
+          <div class="data-pair">
+            <span class="data-pair__label">Gateway</span>
+            <span class="data-pair__value data-pair__value--success">connected</span>
+          </div>
+          <div class="data-pair">
+            <span class="data-pair__label">WebSocket</span>
+            <span class="data-pair__value data-pair__value--success">open</span>
+          </div>
+          <div class="data-pair">
+            <span class="data-pair__label">Requests/min</span>
+            <span class="data-pair__value">142</span>
+          </div>
+          <div class="data-pair">
+            <span class="data-pair__label">Error rate</span>
+            <span class="data-pair__value data-pair__value--success">0.2%</span>
+          </div>
+          <div style="margin-top: 8px;">
+            <div class="data-pair__label" style="font-size: 11px; margin-bottom: 6px;">Signal</div>
+            <div class="waveform">
+              <div class="waveform__bar"></div>
+              <div class="waveform__bar"></div>
+              <div class="waveform__bar"></div>
+              <div class="waveform__bar"></div>
+              <div class="waveform__bar"></div>
+              <div class="waveform__bar"></div>
+              <div class="waveform__bar"></div>
+              <div class="waveform__bar"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section: Memory (AgentDB) -->
+      <div class="debug-section">
+        <div class="debug-section__header">
+          <span class="debug-section__title">AgentDB Memory</span>
+          <span class="debug-section__toggle">&rsaquo;</span>
+        </div>
+        <div class="debug-section__body">
+          <div class="data-pair">
+            <span class="data-pair__label">Entries</span>
+            <span class="data-pair__value">2,847</span>
+          </div>
+          <div class="data-pair">
+            <span class="data-pair__label">HNSW Index</span>
+            <span class="data-pair__value data-pair__value--success">synced</span>
+          </div>
+          <div class="data-pair">
+            <span class="data-pair__label">Last snapshot</span>
+            <span class="data-pair__value">12m ago</span>
+          </div>
+          <div class="data-pair">
+            <span class="data-pair__label">Size</span>
+            <span class="data-pair__value">2.4 GB</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section: Logs -->
+      <div class="debug-section debug-section--open">
+        <div class="debug-section__header">
+          <span class="debug-section__title">Recent Logs</span>
+          <span class="debug-section__toggle">&rsaquo;</span>
+        </div>
+        <div class="debug-section__body">
+          <div class="log-line">
+            <span class="log-line__time">21:20:14</span>
+            <span class="log-line__msg">coder-alpha: wrote token-service.ts</span>
+          </div>
+          <div class="log-line">
+            <span class="log-line__time">21:19:52</span>
+            <span class="log-line__msg--warn">memory: GC threshold reached (90%)</span>
+          </div>
+          <div class="log-line">
+            <span class="log-line__time">21:19:30</span>
+            <span class="log-line__msg">scout-recon: found 14 session endpoints</span>
+          </div>
+          <div class="log-line">
+            <span class="log-line__time">21:18:45</span>
+            <span class="log-line__msg">worker-3: spawned for auth middleware</span>
+          </div>
+          <div class="log-line">
+            <span class="log-line__time">21:18:01</span>
+            <span class="log-line__msg">hive-mind: consensus reached (raft)</span>
+          </div>
+          <div class="log-line">
+            <span class="log-line__time">21:17:22</span>
+            <span class="log-line__msg--err">container: health check failed (staging)</span>
+          </div>
+          <div class="log-line">
+            <span class="log-line__time">21:16:58</span>
+            <span class="log-line__msg">deploy: image pushed to registry</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section: Tokens -->
+      <div class="debug-section">
+        <div class="debug-section__header">
+          <span class="debug-section__title">Token Usage</span>
+          <span class="debug-section__toggle">&rsaquo;</span>
+        </div>
+        <div class="debug-section__body">
+          <div class="data-pair">
+            <span class="data-pair__label">Session total</span>
+            <span class="data-pair__value">847K</span>
+          </div>
+          <div class="data-pair">
+            <span class="data-pair__label">Input</span>
+            <span class="data-pair__value">612K</span>
+          </div>
+          <div class="data-pair">
+            <span class="data-pair__label">Output</span>
+            <span class="data-pair__value">235K</span>
+          </div>
+          <div class="data-pair">
+            <span class="data-pair__label">Est. cost</span>
+            <span class="data-pair__value data-pair__value--accent">$4.28</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

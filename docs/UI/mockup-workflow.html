@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Clawdflare Bridge - Workflow Timeline</title>
+<style>
+/* ============================================================
+   Design Tokens
+   ============================================================ */
+:root {
+  --bg: #09090b;
+  --card: transparent;
+  --card-hover: rgba(255,255,255,0.03);
+  --border: rgba(255,255,255,0.06);
+  --border-strong: rgba(255,255,255,0.12);
+  --text: #fafafa;
+  --text-muted: #71717a;
+  --text-subtle: #52525b;
+  --accent: #e94560;
+  --success: #4ecca3;
+  --warning: #f59e0b;
+  --destructive: #ef4444;
+  --info: #5b8def;
+  --radius: 12px;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --code-bg: rgba(255,255,255,0.03);
+  --diff-add: rgba(78, 204, 163, 0.12);
+  --diff-remove: rgba(233, 69, 96, 0.1);
+  --diff-add-text: #7ee6a8;
+  --diff-remove-text: #ff8a9e;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  height: 100%;
+}
+
+body { height: 100%; overflow: hidden; display: flex; flex-direction: column; }
+
+button {
+  font-family: inherit; font-size: inherit; cursor: pointer;
+  border: none; background: none; color: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ============================================================
+   App Shell
+   ============================================================ */
+.app {
+  display: flex; flex-direction: column; height: 100%;
+  max-width: 428px; margin: 0 auto; width: 100%;
+  position: relative; overflow: hidden; background: var(--bg);
+}
+
+/* Edge Handles */
+.edge-handle {
+  position: absolute; top: 0; bottom: 0; width: 2px; z-index: 100; cursor: grab;
+}
+.edge-handle--left { left: 0; background: rgba(255,255,255,0.04); }
+.edge-handle--right { right: 0; background: rgba(255,255,255,0.04); }
+.edge-handle .notch {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 4px; height: 32px; border-radius: 2px; background: rgba(255,255,255,0.1);
+}
+.edge-handle--left .notch { left: 0; }
+.edge-handle--right .notch { right: 0; }
+
+/* ============================================================
+   Header
+   ============================================================ */
+.header {
+  padding: 14px 20px 12px;
+  flex-shrink: 0;
+}
+.header__breadcrumb {
+  font-size: 12px;
+  color: var(--text-subtle);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.header__breadcrumb a {
+  color: var(--text-muted);
+  text-decoration: none;
+}
+.header__title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.header__title {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+}
+.header__badge {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 10px;
+  border-radius: 999px;
+  letter-spacing: 0.3px;
+}
+.header__badge--active {
+  color: var(--success);
+  background: rgba(78, 204, 163, 0.1);
+}
+
+/* ============================================================
+   Timeline
+   ============================================================ */
+.timeline-area {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px 0 120px;
+  -webkit-overflow-scrolling: touch;
+}
+.timeline-area::-webkit-scrollbar { display: none; }
+
+.timeline {
+  position: relative;
+  padding-left: 40px;
+  margin-left: 20px;
+}
+
+/* Vertical connecting line */
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--border);
+}
+
+/* ============================================================
+   Timeline Entry
+   ============================================================ */
+.tl-entry {
+  position: relative;
+  padding: 0 20px 28px 24px;
+}
+
+/* Dot on the timeline */
+.tl-entry::before {
+  content: '';
+  position: absolute;
+  left: -29px;
+  top: 6px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--text-subtle);
+  z-index: 1;
+}
+.tl-entry--active::before {
+  background: var(--accent);
+  box-shadow: 0 0 10px rgba(233, 69, 96, 0.5);
+}
+.tl-entry--success::before {
+  background: var(--success);
+}
+.tl-entry--warning::before {
+  background: var(--warning);
+}
+
+/* Timestamp */
+.tl-time {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-subtle);
+  letter-spacing: 0.3px;
+  margin-bottom: 4px;
+}
+
+/* ============================================================
+   Entry: User Message
+   ============================================================ */
+.tl-user .tl-content {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text);
+}
+.tl-user .tl-author {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+/* ============================================================
+   Entry: Agent Message
+   ============================================================ */
+.tl-agent .tl-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.tl-agent .tl-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.tl-avatar--coder { background: rgba(139, 92, 246, 0.25); color: #a78bfa; }
+.tl-avatar--scout { background: rgba(91, 141, 239, 0.25); color: #93b5f5; }
+.tl-avatar--reviewer { background: rgba(233, 69, 96, 0.2); color: #ff8a9e; }
+.tl-avatar--worker { background: rgba(78, 204, 163, 0.2); color: #7ee6a8; }
+
+.tl-agent .tl-agent-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+.tl-agent .tl-content {
+  font-size: 14px;
+  line-height: 1.65;
+  color: rgba(250,250,250,0.85);
+}
+
+/* ============================================================
+   Entry: Tool Output (collapsible)
+   ============================================================ */
+.tl-tool-output {
+  margin-top: 8px;
+}
+.tl-tool-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  padding: 6px 0;
+  cursor: pointer;
+}
+.tl-tool-toggle__arrow {
+  transition: transform 200ms ease;
+  font-size: 10px;
+}
+.tl-tool-toggle--open .tl-tool-toggle__arrow {
+  transform: rotate(90deg);
+}
+.tl-tool-code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.65;
+  color: rgba(250,250,250,0.7);
+  background: var(--code-bg);
+  border-radius: 8px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  margin-top: 4px;
+  white-space: pre;
+}
+
+/* ============================================================
+   Entry: Diff
+   ============================================================ */
+.tl-diff {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.7;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+.tl-diff__line {
+  padding: 1px 12px;
+}
+.tl-diff__line--add {
+  background: var(--diff-add);
+  color: var(--diff-add-text);
+}
+.tl-diff__line--remove {
+  background: var(--diff-remove);
+  color: var(--diff-remove-text);
+}
+.tl-diff__line--context {
+  color: var(--text-subtle);
+}
+.tl-diff__header {
+  color: var(--text-subtle);
+  padding: 4px 12px;
+  font-size: 11px;
+}
+
+/* ============================================================
+   Entry: Approval
+   ============================================================ */
+.tl-approval {
+  margin-top: 10px;
+}
+.tl-approval__question {
+  font-size: 14px;
+  margin-bottom: 10px;
+  color: var(--text);
+}
+.tl-approval__actions {
+  display: flex;
+  gap: 10px;
+}
+.tl-btn {
+  padding: 7px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 150ms ease;
+}
+.tl-btn--approve {
+  background: rgba(78, 204, 163, 0.15);
+  color: var(--success);
+  border: 1px solid rgba(78, 204, 163, 0.2);
+}
+.tl-btn--approve:active {
+  background: rgba(78, 204, 163, 0.25);
+}
+.tl-btn--reject {
+  background: rgba(233, 69, 96, 0.1);
+  color: var(--accent);
+  border: 1px solid rgba(233, 69, 96, 0.15);
+}
+.tl-btn--reject:active {
+  background: rgba(233, 69, 96, 0.2);
+}
+.tl-btn--edit {
+  color: var(--text-muted);
+  border: 1px solid var(--border-strong);
+}
+
+/* ============================================================
+   Entry: Status Change
+   ============================================================ */
+.tl-status {
+  font-size: 12px;
+  color: var(--text-subtle);
+  font-style: italic;
+}
+
+/* ============================================================
+   Thinking Animation
+   ============================================================ */
+.tl-thinking {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 0;
+}
+.tl-thinking__dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--text-subtle);
+  animation: thinking 1.4s infinite ease-in-out;
+}
+.tl-thinking__dot:nth-child(2) { animation-delay: 0.2s; }
+.tl-thinking__dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes thinking {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1.1); }
+}
+
+/* ============================================================
+   Input Area
+   ============================================================ */
+.input-area {
+  position: absolute;
+  bottom: 56px;
+  left: 0;
+  right: 0;
+  padding: 12px 20px calc(12px + var(--safe-bottom));
+  background: linear-gradient(to top, var(--bg) 70%, transparent);
+  z-index: 80;
+}
+.input-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  background: rgba(255,255,255,0.02);
+}
+.input-row input {
+  flex: 1;
+  font-size: 14px;
+  color: var(--text);
+  background: none;
+  border: none;
+  outline: none;
+}
+.input-row input::placeholder {
+  color: var(--text-subtle);
+}
+.input-mic {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: var(--text-muted);
+  transition: all 150ms ease;
+  flex-shrink: 0;
+}
+.input-mic:active {
+  color: var(--accent);
+}
+.input-send {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  color: white;
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   Bottom Bar
+   ============================================================ */
+.bottom-bar {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  display: flex; justify-content: space-around; align-items: center;
+  padding: 8px 0 calc(8px + var(--safe-bottom));
+  background: var(--bg); border-top: 1px solid var(--border); z-index: 90;
+}
+.bottom-bar__item {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 4px 12px; font-size: 10px; color: var(--text-subtle);
+  letter-spacing: 0.3px; transition: color 150ms ease;
+}
+.bottom-bar__item--active { color: var(--text); }
+.bottom-bar__icon { font-size: 18px; line-height: 1; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Edge Handles -->
+  <div class="edge-handle edge-handle--left"><div class="notch"></div></div>
+  <div class="edge-handle edge-handle--right"><div class="notch"></div></div>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header__breadcrumb">
+      <a href="#">MentraOS Core</a>
+      <span>&rsaquo;</span>
+      <span>Auth Service Refactor</span>
+    </div>
+    <div class="header__title-row">
+      <h1 class="header__title">Auth Service Refactor</h1>
+      <span class="header__badge header__badge--active">Active</span>
+    </div>
+  </div>
+
+  <!-- Timeline -->
+  <div class="timeline-area">
+    <div class="timeline">
+
+      <!-- Status Change -->
+      <div class="tl-entry tl-entry--success">
+        <div class="tl-time">9:12 PM</div>
+        <div class="tl-status">Workflow started by Adrian</div>
+      </div>
+
+      <!-- User Message -->
+      <div class="tl-entry tl-user">
+        <div class="tl-time">9:12 PM</div>
+        <div class="tl-author">Adrian</div>
+        <div class="tl-content">
+          Refactor the auth service to use JWT with refresh token rotation. Replace the current session-based auth. Keep backward compatibility for the next 2 releases.
+        </div>
+      </div>
+
+      <!-- Agent Message -->
+      <div class="tl-entry tl-agent tl-entry--success">
+        <div class="tl-time">9:13 PM</div>
+        <div class="tl-head">
+          <span class="tl-avatar tl-avatar--coder">C</span>
+          <span class="tl-agent-name">coder-alpha</span>
+        </div>
+        <div class="tl-content">
+          Understood. I'll structure this as a 3-phase migration: (1) add JWT layer alongside sessions, (2) migrate endpoints, (3) deprecate sessions. Starting with the token service.
+        </div>
+      </div>
+
+      <!-- Tool Output -->
+      <div class="tl-entry tl-agent">
+        <div class="tl-time">9:14 PM</div>
+        <div class="tl-head">
+          <span class="tl-avatar tl-avatar--coder">C</span>
+          <span class="tl-agent-name">coder-alpha</span>
+        </div>
+        <div class="tl-content">Created token service with rotation logic.</div>
+        <div class="tl-tool-output">
+          <div class="tl-tool-toggle tl-tool-toggle--open">
+            <span class="tl-tool-toggle__arrow">&rsaquo;</span>
+            src/auth/token-service.ts
+          </div>
+          <div class="tl-tool-code">export class TokenService {
+  private readonly secret: string;
+  private readonly accessTTL = '15m';
+  private readonly refreshTTL = '7d';
+
+  async generatePair(userId: string) {
+    const access = await this.sign(
+      { sub: userId, type: 'access' },
+      this.accessTTL
+    );
+    const refresh = await this.sign(
+      { sub: userId, type: 'refresh' },
+      this.refreshTTL
+    );
+    return { access, refresh };
+  }
+}</div>
+        </div>
+      </div>
+
+      <!-- Diff -->
+      <div class="tl-entry tl-agent tl-entry--success">
+        <div class="tl-time">9:16 PM</div>
+        <div class="tl-head">
+          <span class="tl-avatar tl-avatar--coder">C</span>
+          <span class="tl-agent-name">coder-alpha</span>
+        </div>
+        <div class="tl-content">Updated middleware to accept both auth methods during migration.</div>
+        <div class="tl-diff">
+          <div class="tl-diff__header">src/middleware/auth.ts</div>
+          <div class="tl-diff__line tl-diff__line--context"> export async function authMiddleware(req, res, next) {</div>
+          <div class="tl-diff__line tl-diff__line--remove">-  const session = await getSession(req);</div>
+          <div class="tl-diff__line tl-diff__line--remove">-  if (!session) return res.status(401).end();</div>
+          <div class="tl-diff__line tl-diff__line--add">+  const user = await resolveAuth(req); // JWT or session</div>
+          <div class="tl-diff__line tl-diff__line--add">+  if (!user) return res.status(401).end();</div>
+          <div class="tl-diff__line tl-diff__line--add">+  req.user = user;</div>
+          <div class="tl-diff__line tl-diff__line--context">   next();</div>
+        </div>
+      </div>
+
+      <!-- Scout Report -->
+      <div class="tl-entry tl-agent">
+        <div class="tl-time">9:18 PM</div>
+        <div class="tl-head">
+          <span class="tl-avatar tl-avatar--scout">S</span>
+          <span class="tl-agent-name">scout-recon</span>
+        </div>
+        <div class="tl-content">
+          Found 14 endpoints using session auth. 3 also pass tokens to external services and will need special handling.
+        </div>
+      </div>
+
+      <!-- Approval Request -->
+      <div class="tl-entry tl-entry--active">
+        <div class="tl-time">9:20 PM</div>
+        <div class="tl-head">
+          <span class="tl-avatar tl-avatar--reviewer">R</span>
+          <span class="tl-agent-name">reviewer-sec</span>
+        </div>
+        <div class="tl-approval">
+          <div class="tl-approval__question">
+            Ready to apply changes to 14 endpoints. This will modify auth handling across the entire API surface. Proceed?
+          </div>
+          <div class="tl-approval__actions">
+            <button class="tl-btn tl-btn--approve">Approve</button>
+            <button class="tl-btn tl-btn--reject">Reject</button>
+            <button class="tl-btn tl-btn--edit">Edit scope</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Currently thinking -->
+      <div class="tl-entry tl-entry--active tl-agent">
+        <div class="tl-time">now</div>
+        <div class="tl-head">
+          <span class="tl-avatar tl-avatar--worker">W</span>
+          <span class="tl-agent-name">worker-3</span>
+        </div>
+        <div class="tl-thinking">
+          <span class="tl-thinking__dot"></span>
+          <span class="tl-thinking__dot"></span>
+          <span class="tl-thinking__dot"></span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Input Area -->
+  <div class="input-area">
+    <div class="input-row">
+      <input type="text" placeholder="Message this workflow...">
+      <button class="input-mic">&micro;</button>
+      <button class="input-send">&uarr;</button>
+    </div>
+  </div>
+
+  <!-- Bottom Bar -->
+  <div class="bottom-bar">
+    <button class="bottom-bar__item bottom-bar__item--active">
+      <span class="bottom-bar__icon">&equiv;</span>
+      Chat
+    </button>
+    <button class="bottom-bar__item">
+      <span class="bottom-bar__icon">&check;</span>
+      Tasks
+    </button>
+    <button class="bottom-bar__item">
+      <span class="bottom-bar__icon">&square;</span>
+      Files
+    </button>
+    <button class="bottom-bar__item">
+      <span class="bottom-bar__icon">&bull;</span>
+      Settings
+    </button>
+  </div>
+
+</div>
+</body>
+</html>

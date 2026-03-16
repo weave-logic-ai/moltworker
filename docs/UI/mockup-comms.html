@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Clawdflare Bridge - Communications</title>
+<style>
+/* ============================================================
+   Design Tokens
+   ============================================================ */
+:root {
+  --bg: #09090b;
+  --card-hover: rgba(255,255,255,0.03);
+  --border: rgba(255,255,255,0.06);
+  --border-strong: rgba(255,255,255,0.12);
+  --text: #fafafa;
+  --text-muted: #71717a;
+  --text-subtle: #52525b;
+  --accent: #e94560;
+  --success: #4ecca3;
+  --warning: #f59e0b;
+  --destructive: #ef4444;
+  --info: #5b8def;
+  --radius: 12px;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  height: 100%;
+}
+
+body { height: 100%; overflow: hidden; display: flex; flex-direction: column; }
+
+button {
+  font-family: inherit; font-size: inherit; cursor: pointer;
+  border: none; background: none; color: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ============================================================
+   App Shell
+   ============================================================ */
+.app {
+  display: flex; flex-direction: column; height: 100%;
+  max-width: 428px; margin: 0 auto; width: 100%;
+  position: relative; overflow: hidden; background: var(--bg);
+}
+
+/* Edge Handles */
+.edge-handle {
+  position: absolute; top: 0; bottom: 0; width: 2px; z-index: 100; cursor: grab;
+}
+.edge-handle--left { left: 0; background: rgba(255,255,255,0.04); }
+.edge-handle--right { right: 0; background: rgba(255,255,255,0.04); }
+.edge-handle .notch {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 4px; height: 32px; border-radius: 2px; background: rgba(255,255,255,0.1);
+}
+.edge-handle--left .notch { left: 0; }
+.edge-handle--right .notch { right: 0; }
+
+/* ============================================================
+   Header
+   ============================================================ */
+.header {
+  padding: 14px 20px 0;
+  flex-shrink: 0;
+}
+.header__title {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  margin-bottom: 16px;
+}
+
+/* ============================================================
+   Tabs (underline style)
+   ============================================================ */
+.tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  padding: 0 20px;
+  flex-shrink: 0;
+}
+.tab {
+  padding: 10px 0;
+  margin-right: 24px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-subtle);
+  position: relative;
+  transition: color 150ms ease;
+}
+.tab--active {
+  color: var(--text);
+}
+.tab--active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 1px 1px 0 0;
+}
+.tab__badge {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  background: rgba(233, 69, 96, 0.15);
+  color: var(--accent);
+  padding: 1px 6px;
+  border-radius: 999px;
+  margin-left: 6px;
+  vertical-align: 1px;
+}
+
+/* ============================================================
+   Content Area
+   ============================================================ */
+.content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0 0 80px;
+  -webkit-overflow-scrolling: touch;
+}
+.content::-webkit-scrollbar { display: none; }
+
+/* ============================================================
+   Email List (flowing rows)
+   ============================================================ */
+.email-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 150ms ease;
+  position: relative;
+}
+.email-item:active {
+  background: var(--card-hover);
+}
+.email-item--unread .email-item__from {
+  font-weight: 600;
+  color: var(--text);
+}
+.email-item--unread .email-item__subject {
+  color: var(--text);
+}
+
+/* Priority dot */
+.email-item__priority {
+  width: 3px;
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 0 2px 2px 0;
+}
+.email-item__priority--critical { background: var(--destructive); }
+.email-item__priority--high { background: var(--warning); }
+.email-item__priority--normal { background: var(--info); }
+
+.email-item__body {
+  flex: 1;
+  min-width: 0;
+}
+.email-item__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 2px;
+}
+.email-item__from {
+  font-size: 14px;
+  font-weight: 450;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.email-item__time {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-subtle);
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+.email-item__subject {
+  font-size: 13px;
+  color: rgba(250,250,250,0.8);
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.email-item__preview {
+  font-size: 12px;
+  color: var(--text-subtle);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ============================================================
+   Message List (with avatars)
+   ============================================================ */
+.msg-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+.msg-item:active {
+  background: var(--card-hover);
+}
+.msg-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.msg-avatar--blue { background: rgba(91, 141, 239, 0.2); color: #93b5f5; }
+.msg-avatar--purple { background: rgba(139, 92, 246, 0.2); color: #a78bfa; }
+.msg-avatar--green { background: rgba(78, 204, 163, 0.2); color: #7ee6a8; }
+.msg-avatar--red { background: rgba(233, 69, 96, 0.2); color: #ff8a9e; }
+
+.msg-item__body {
+  flex: 1;
+  min-width: 0;
+}
+.msg-item__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 2px;
+}
+.msg-item__name {
+  font-size: 14px;
+  font-weight: 500;
+}
+.msg-item__time {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-subtle);
+  flex-shrink: 0;
+}
+.msg-item__preview {
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.msg-item__unread-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+  align-self: center;
+}
+
+/* ============================================================
+   Posts (borderless cards)
+   ============================================================ */
+.post-item {
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+.post-item:active {
+  background: var(--card-hover);
+}
+.post-item__title {
+  font-size: 15px;
+  font-weight: 500;
+  margin-bottom: 4px;
+  line-height: 1.4;
+}
+.post-item__preview {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.post-item__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.post-tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.06);
+  color: var(--text-muted);
+}
+.post-tag--accent {
+  background: rgba(233, 69, 96, 0.1);
+  color: var(--accent);
+}
+.post-item__time {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-subtle);
+  margin-left: auto;
+}
+
+/* ============================================================
+   Bottom Bar
+   ============================================================ */
+.bottom-bar {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  display: flex; justify-content: space-around; align-items: center;
+  padding: 8px 0 calc(8px + var(--safe-bottom));
+  background: var(--bg); border-top: 1px solid var(--border); z-index: 90;
+}
+.bottom-bar__item {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 4px 12px; font-size: 10px; color: var(--text-subtle);
+  letter-spacing: 0.3px; transition: color 150ms ease;
+}
+.bottom-bar__item--active { color: var(--text); }
+.bottom-bar__icon { font-size: 18px; line-height: 1; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Edge Handles -->
+  <div class="edge-handle edge-handle--left"><div class="notch"></div></div>
+  <div class="edge-handle edge-handle--right"><div class="notch"></div></div>
+
+  <!-- Header -->
+  <div class="header">
+    <h1 class="header__title">Communications</h1>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab tab--active">Email <span class="tab__badge">3</span></button>
+    <button class="tab">Messages <span class="tab__badge">5</span></button>
+    <button class="tab">Posts</button>
+  </div>
+
+  <!-- Content: Email view active -->
+  <div class="content">
+
+    <!-- Email: Critical -->
+    <div class="email-item email-item--unread">
+      <div class="email-item__priority email-item__priority--critical"></div>
+      <div class="email-item__body">
+        <div class="email-item__top">
+          <span class="email-item__from">Cloudflare Alerts</span>
+          <span class="email-item__time">9:18 PM</span>
+        </div>
+        <div class="email-item__subject">Container deployment failed - staging</div>
+        <div class="email-item__preview">Health check timeout after 30s on worker-staging-us-east-1. Memory limit exceeded during startup...</div>
+      </div>
+    </div>
+
+    <!-- Email: High -->
+    <div class="email-item email-item--unread">
+      <div class="email-item__priority email-item__priority--high"></div>
+      <div class="email-item__body">
+        <div class="email-item__top">
+          <span class="email-item__from">GitHub</span>
+          <span class="email-item__time">8:45 PM</span>
+        </div>
+        <div class="email-item__subject">PR #312: Auth middleware refactor</div>
+        <div class="email-item__preview">sidharthachatterjee requested your review on weave-logic-ai/mentraos-core#312...</div>
+      </div>
+    </div>
+
+    <!-- Email: Normal -->
+    <div class="email-item email-item--unread">
+      <div class="email-item__priority email-item__priority--normal"></div>
+      <div class="email-item__body">
+        <div class="email-item__top">
+          <span class="email-item__from">Sentry</span>
+          <span class="email-item__time">7:30 PM</span>
+        </div>
+        <div class="email-item__subject">Weekly error digest - MentraOS</div>
+        <div class="email-item__preview">12 new issues, 3 regressions detected. Top error: TypeError in auth/session.ts:142...</div>
+      </div>
+    </div>
+
+    <!-- Email: Read -->
+    <div class="email-item">
+      <div class="email-item__body">
+        <div class="email-item__top">
+          <span class="email-item__from">Google Cloud</span>
+          <span class="email-item__time">5:12 PM</span>
+        </div>
+        <div class="email-item__subject">Billing summary - March 2026</div>
+        <div class="email-item__preview">Your estimated charges for the current billing period are $247.83. View details...</div>
+      </div>
+    </div>
+
+    <div class="email-item">
+      <div class="email-item__body">
+        <div class="email-item__top">
+          <span class="email-item__from">Linear</span>
+          <span class="email-item__time">3:00 PM</span>
+        </div>
+        <div class="email-item__subject">Sprint 14 completed</div>
+        <div class="email-item__preview">18/20 issues completed. 2 moved to backlog. Velocity: 34 points...</div>
+      </div>
+    </div>
+
+    <div class="email-item">
+      <div class="email-item__body">
+        <div class="email-item__top">
+          <span class="email-item__from">Docker Hub</span>
+          <span class="email-item__time">1:22 PM</span>
+        </div>
+        <div class="email-item__subject">Image scan complete: mentraos/worker:latest</div>
+        <div class="email-item__preview">0 critical, 2 high, 5 medium vulnerabilities found. Full report attached...</div>
+      </div>
+    </div>
+
+    <div class="email-item">
+      <div class="email-item__body">
+        <div class="email-item__top">
+          <span class="email-item__from">Cal.com</span>
+          <span class="email-item__time">11:00 AM</span>
+        </div>
+        <div class="email-item__subject">Reminder: Architecture review tomorrow</div>
+        <div class="email-item__preview">You have a meeting scheduled for March 16 at 10:00 AM PST with the platform team...</div>
+      </div>
+    </div>
+
+    <div class="email-item">
+      <div class="email-item__body">
+        <div class="email-item__top">
+          <span class="email-item__from">Vercel</span>
+          <span class="email-item__time">Yesterday</span>
+        </div>
+        <div class="email-item__subject">Deploy preview ready: docs-site</div>
+        <div class="email-item__preview">Your latest push to feature/new-docs has been deployed. Preview URL: docs-pr-47.vercel.app...</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Bottom Bar -->
+  <div class="bottom-bar">
+    <button class="bottom-bar__item">
+      <span class="bottom-bar__icon">&equiv;</span>
+      Chat
+    </button>
+    <button class="bottom-bar__item bottom-bar__item--active">
+      <span class="bottom-bar__icon">&oplus;</span>
+      Comms
+    </button>
+    <button class="bottom-bar__item">
+      <span class="bottom-bar__icon">&loz;</span>
+      Admin
+    </button>
+    <button class="bottom-bar__item">
+      <span class="bottom-bar__icon">&bull;</span>
+      Settings
+    </button>
+  </div>
+
+</div>
+</body>
+</html>
