@@ -168,13 +168,31 @@ A9: Decommission CF containers       B9: Production polish
 ### B5: Webview React App Scaffold
 **Agent:** sparc-coder (with mentra-ui skill)
 **Context needed:** docs/UI/design-system.md, docs/UI/app-structure.md, symposium answers
+
+**Bootstrap from Track template:**
+1. Clone https://github.com/shadcnstudio/shadcn-nextjs-track-landing-page-free
+2. Extract the theme (colors, typography, spacing, component styles)
+3. Pull useful components from https://github.com/shadcnstudio/shadcn-studio/tree/main/src
+4. Adapt for our webview (React + Vite, not Next.js — strip SSR/routing)
+
 **Deliverables:**
-- `webview/` directory with React + Vite + Tailwind + shadcn/ui
-- Package.json, tsconfig, tailwind.config
+- `webview/` directory scaffolded from Track template theme
+- Theme extracted: CSS variables, Tailwind config, Geist font
+- shadcn/ui components initialized (card, tabs, badge, avatar, accordion, dialog, progress, button, input)
+- shadcn-studio components evaluated and pulled where useful
 - App shell with routing (home, workflow, comms, admin, settings)
-- MentraAuthProvider integration
-- WebSocket connection to bridge
-**Batch size:** ~10 files, scaffold only
+- MentraAuthProvider integration placeholder
+- WebSocket connection to bridge placeholder
+- Left/right drawer shell with visible edge handles
+- Bottom tab bar (context-aware: home vs workflow)
+- Agent avatar component
+
+**Key references:**
+- Track landing page: clean vertical flow, timeline, minimal borders
+- shadcn-studio/src: production components, charts, data display
+- AI SDK Elements (elements.ai-sdk.dev): persona, chain-of-thought, task, queue, confirmation, suggestions, attachments, prompt-input, context
+
+**Batch size:** ~15 files, scaffold only
 **Dependencies:** None (can start immediately, parallel with B1)
 
 ### B6: Chat + Timeline Components
