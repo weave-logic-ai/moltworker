@@ -102,7 +102,7 @@ Workload baseline: ~1.35 GB RAM (OpenClaw ~500MB + bridge ~100MB + cloudflared ~
 |-------|----------|------|-----|------|------|---------|
 | **Start** | e2-medium | 2 shared | 4GB | x86 | $26.33 | Validate workload |
 | **Test ARM** | t2a-standard-1 | 1 dedicated | 4GB | ARM | $29.98 | Test ARM compatibility |
-| **Production** | c4a-standard-1 | 1 dedicated | 4GB | ARM (Axion) | $22.52 (1yr CUD) | Best perf/$ + AI inference |
+| **Production** | **c4a-standard-1** | **1 dedicated** | **4GB** | **ARM (Axion)** | **$22.52 (1yr CUD)** | **SELECTED** |
 
 ### Why C4A Axion (Production Target)
 
