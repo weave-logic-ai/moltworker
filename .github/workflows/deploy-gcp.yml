@@ -10,7 +10,7 @@ on:
       - 'skills/mentra-bridge/**'
       - 'scripts/**'
       - 'config/**'
-      - 'ecosystem.config.js'
+      - 'ecosystem.config.cjs'
 
 jobs:
   deploy:
@@ -28,5 +28,5 @@ jobs:
             cd /opt/moltworker
             git pull origin main
             npm install
-            pm2 restart ecosystem.config.js
+            pm2 restart ecosystem.config.cjs
             pm2 save

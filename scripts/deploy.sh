@@ -16,7 +16,7 @@ echo "Installing dependencies..."
 npm install
 
 echo "Restarting pm2 services..."
-pm2 restart ecosystem.config.js
+pm2 restart ecosystem.config.cjs
 
 echo "Saving pm2 process list..."
 pm2 save
