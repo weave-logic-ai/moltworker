@@ -141,7 +141,7 @@ class OpenClawBridge extends AppServer {
       if (!hasAudio) return;
       state.startSpeaking(); state.recordSpoken(t);
       emitRelay({ type: 'tts', text: t, status: 'speaking' });
-      try { await session.audio.speak(t); emitRelay({ type: 'tts', text: t, status: 'done' }); }
+      try { await session.audio.speak(t, { voice_id: 'Wq15xSaY3gWvazBRaGEU', model_id: 'eleven_flash_v2_5' }); emitRelay({ type: 'tts', text: t, status: 'done' }); }
       catch (e) { console.error('[bridge] TTS err:', e?.message); emitRelay({ type: 'tts', text: t, status: 'error' }); }
       finally { state.stopSpeaking(); }
     };
