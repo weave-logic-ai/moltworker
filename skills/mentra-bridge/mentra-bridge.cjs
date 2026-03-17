@@ -61,11 +61,13 @@ class SessionState {
   }
   lock() { if (this.isProcessing) return false; this.isProcessing = true; return true; }
   unlock() { this.isProcessing = false; }
-  isEcho(text) {
-    if (!this.lastSpokenText || Date.now() - this.lastSpokenAt > ECHO_WINDOW_MS) return false;
-    const s = this.lastSpokenText.toLowerCase().trim();
-    const h = text.toLowerCase().trim();
-    return s === h || s.includes(h) || h.includes(s);
+  // Block transcription while speaking + 3s cooldown after TTS finishes
+  startSpeaking() { this.isSpeaking = true; this.speakingEndAt = 0; }
+  stopSpeaking() { this.isSpeaking = false; this.speakingEndAt = Date.now(); }
+  shouldIgnoreTranscription() {
+    if (this.isSpeaking) return true;
+    if (this.speakingEndAt && Date.now() - this.speakingEndAt < 3000) return true;
+    return false;
   }
   recordSpoken(t) { this.lastSpokenText = t; this.lastSpokenAt = Date.now(); }
   touch() { this.lastActivity = Date.now(); }
@@ -137,16 +139,16 @@ class OpenClawBridge extends AppServer {
     const show = async (t) => { if (hasDisplay) try { await session.layouts.showTextWall(t); } catch (e) { console.log('[bridge] showText err:', e.message); } };
     const speak = async (t) => {
       if (!hasAudio) return;
-      state.isSpeaking = true; state.recordSpoken(t);
+      state.startSpeaking(); state.recordSpoken(t);
       emitRelay({ type: 'tts', text: t, status: 'speaking' });
       try { await session.audio.speak(t); emitRelay({ type: 'tts', text: t, status: 'done' }); }
-      catch (e) { console.error('[bridge] TTS err:', e.message); emitRelay({ type: 'tts', text: t, status: 'error' }); }
-      finally { state.isSpeaking = false; }
+      catch (e) { console.error('[bridge] TTS err:', e?.message); emitRelay({ type: 'tts', text: t, status: 'error' }); }
+      finally { state.stopSpeaking(); }
     };
     const stopAudio = async () => {
       if (!hasAudio) return;
-      try { if (session.audio.stop) await session.audio.stop(); } catch (e) { console.error('[bridge] stop err:', e.message); }
-      state.isSpeaking = false;
+      try { if (session.audio.stop) await session.audio.stop(); } catch (e) { console.error('[bridge] stop err:', e?.message); }
+      state.stopSpeaking();
     };
 
     emitRelay({ type: 'session', event: 'connected', userId, sessionId, capabilities: session.capabilities || {} });
@@ -158,7 +160,8 @@ class OpenClawBridge extends AppServer {
       session.events.onTranscription(async (data) => {
         emitRelay({ type: 'transcription', text: data.text, isFinal: data.isFinal, language: data.transcribeLanguage, confidence: data.confidence });
         if (!data.isFinal) return;
-        if (state.isEcho(data.text)) { console.log(`[bridge] Echo, ignoring`); return; }
+        // Block all transcription while speaking or in 3s cooldown after TTS
+        if (state.shouldIgnoreTranscription()) { console.log(`[bridge] Speaking/cooldown, ignoring transcription`); return; }
         if (!state.lock()) { console.log(`[bridge] Busy, skip`); return; }
         try {
           state.addMessage('user', data.text);
