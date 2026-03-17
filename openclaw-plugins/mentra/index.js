@@ -36,11 +36,20 @@ const mentraChannelPlugin = {
     return { connected: true, label: 'Bridge running on :7010' };
   },
 
+  // Account management (required by channel interface)
+  listAccountIds() { return ['default']; },
+  getAccount(id) { return { accountId: id || 'default', label: 'Mentra Glasses', connected: true }; },
+  isReady() { return true; },
+
   // Send message to glasses (called by OpenClaw agent when replying)
   async send(to, text, opts) {
     console.log(`[mentra-channel] send to=${to} text="${text.substring(0, 50)}..."`);
     return { ok: true, messageId: `mentra-${Date.now()}` };
   },
+
+  // Receive setup (for pairing flow)
+  async setup(config) { return { ok: true }; },
+  async teardown() { return { ok: true }; },
 };
 
 const plugin = {
