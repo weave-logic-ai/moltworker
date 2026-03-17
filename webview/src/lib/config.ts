@@ -22,6 +22,13 @@ export interface AppConfig {
 
 const DEFAULT_GATEWAY_WS = 'ws://localhost:18789';
 const DEFAULT_RELAY_WS = 'ws://localhost:3210';
+
+/** Derive relay URL from current origin via /relay/ path */
+function deriveRelayFromOrigin(): string {
+  const loc = window.location;
+  const protocol = loc.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${protocol}//${loc.host}/relay/`;
+}
 const DEFAULT_CHAT_API = 'https://moltworker.aebots.org/v1/chat/completions';
 
 // ---------------------------------------------------------------------------
@@ -84,12 +91,14 @@ export function getConfig(): AppConfig {
       ? deriveGatewayFromOrigin()
       : DEFAULT_GATEWAY_WS);
 
-  // Relay URL: URL param > env > default
+  // Relay URL: URL param > env > derive from origin (/relay/) > default
   const relayUrl =
     urlParams.get('relay_url') ||
     hashParams['relay_url'] ||
     import.meta.env.VITE_RELAY_URL ||
-    DEFAULT_RELAY_WS;
+    (window.location.hostname !== 'localhost'
+      ? deriveRelayFromOrigin()
+      : DEFAULT_RELAY_WS);
 
   // Gateway token: hash param > URL param > env
   const gatewayToken =
