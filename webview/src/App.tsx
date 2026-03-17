@@ -9,7 +9,6 @@ import { useState, useEffect, useCallback } from 'react';
 import type { AppState } from '@/types';
 import { getHashPath, matchRoute, onRouteChange, isWorkflowRoute, getTabFromPath } from '@/lib/router';
 import { getState, subscribe, setActiveTab, closeAllOverlays } from '@/store/app-state';
-import { connect as connectGateway, disconnect as disconnectGateway } from '@/lib/gateway';
 import { connect as connectRelay, disconnect as disconnectRelay } from '@/lib/relay';
 import { TopBar } from '@/components/shell/TopBar';
 import { BottomBar } from '@/components/shell/BottomBar';
@@ -44,15 +43,12 @@ export function App() {
     return unsubscribe;
   }, []);
 
-  // Initialize WebSocket connections on mount
+  // Initialize relay WebSocket on mount
+  // Note: Gateway uses REST API only (POST /v1/chat/completions with bearer token).
+  // The OpenClaw WebSocket requires device pairing which we don't support here.
   useEffect(() => {
-    connectGateway();
     connectRelay();
-
-    return () => {
-      disconnectGateway();
-      disconnectRelay();
-    };
+    return () => { disconnectRelay(); };
   }, []);
 
   // Determine which page to render

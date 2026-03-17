@@ -15,7 +15,6 @@
 import { useState, useEffect } from 'react';
 import type { AgentStatus } from '@/types';
 import { toggleLeftDrawer, toggleRightDrawer } from '@/store/app-state';
-import { getConnectionState, onStateChange, type GatewayConnectionState } from '@/lib/gateway';
 import { getRelayConnectionState, onRelayStateChange, type RelayConnectionState } from '@/lib/relay';
 
 interface TopBarProps {
@@ -40,11 +39,25 @@ const AGENT_STATUS_COLOR: Record<AgentStatus, string> = {
 };
 
 export function TopBar({ breadcrumb, glassesConnected, agentStatus }: TopBarProps) {
-  const [gwState, setGwState] = useState<GatewayConnectionState>(getConnectionState());
   const [relayState, setRelayState] = useState<RelayConnectionState>(getRelayConnectionState());
+  const [gatewayHealthy, setGatewayHealthy] = useState(false);
 
-  useEffect(() => onStateChange((s) => setGwState(s)), []);
   useEffect(() => onRelayStateChange((s) => setRelayState(s)), []);
+
+  // Poll gateway health via REST (no WS pairing needed)
+  useEffect(() => {
+    let active = true;
+    const check = async () => {
+      try {
+        const res = await fetch('https://moltworker.aebots.org/health', { signal: AbortSignal.timeout(5000) });
+        const data = await res.json();
+        if (active) setGatewayHealthy(data.ok === true);
+      } catch { if (active) setGatewayHealthy(false); }
+    };
+    check();
+    const id = setInterval(check, 15000);
+    return () => { active = false; clearInterval(id); };
+  }, []);
 
   const breadcrumbText = breadcrumb.length > 0
     ? breadcrumb.join(' > ')
@@ -59,14 +72,12 @@ export function TopBar({ breadcrumb, glassesConnected, agentStatus }: TopBarProp
     relayState === 'connecting',
   );
 
-  // Agent/gateway status: use agent status color if gateway connected, else connection color
-  const agentDotColor = gwState === 'connected'
+  // Agent/gateway status: use agent status color if gateway healthy, else red
+  const agentDotColor = gatewayHealthy
     ? AGENT_STATUS_COLOR[agentStatus]
-    : gwState === 'connecting'
-      ? 'var(--warning)'
-      : 'var(--destructive)';
+    : 'var(--destructive)';
 
-  const agentGlow = agentStatus === 'thinking' && gwState === 'connected';
+  const agentGlow = agentStatus === 'thinking' && gatewayHealthy;
 
   return (
     <header style={{
@@ -127,7 +138,7 @@ export function TopBar({ breadcrumb, glassesConnected, agentStatus }: TopBarProp
         <span
           className={`status-dot ${agentGlow ? 'status-dot--glow' : ''}`}
           style={{ background: agentDotColor }}
-          title={`Agent: ${agentStatus} | Gateway: ${gwState}`}
+          title={`Agent: ${agentStatus} | Gateway: ${gatewayHealthy ? 'healthy' : 'down'}`}
         />
 
         {/* Time */}
