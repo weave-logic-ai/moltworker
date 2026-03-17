@@ -14,6 +14,7 @@
 const { AppServer } = require('@mentra/sdk');
 const fs = require('fs');
 const path = require('path');
+const { normalizeForTts } = require('./tts-normalize.cjs');
 
 // -- Config -----------------------------------------------------------------
 const OPENCLAW_URL = process.env.OPENCLAW_URL || `http://localhost:${process.env.OPENCLAW_PORT || 18789}`;
@@ -172,8 +173,10 @@ class OpenClawBridge extends AppServer {
     sessionStates.set(sessionId, state);
 
     const show = async (t) => { if (hasDisplay) try { await session.layouts.showTextWall(t); } catch (e) { console.log('[bridge] showText err:', e.message); } };
-    const speak = async (t) => {
+    const speak = async (raw) => {
       if (!hasAudio || !controls.audioEnabled) return;
+      const t = normalizeForTts(raw);
+      if (!t) return;
       state.startSpeaking(); state.recordSpoken(t);
       emitRelay({ type: 'tts', text: t, status: 'speaking' });
       try {
