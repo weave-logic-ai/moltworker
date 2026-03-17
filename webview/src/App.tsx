@@ -70,7 +70,7 @@ export function App() {
       {/* Top Bar */}
       <TopBar
         breadcrumb={appState.breadcrumb}
-        glassesConnected={appState.glassesConnected}
+        glassesConnected={true /* webview runs on glasses, always connected */}
         bridgeConnected={appState.bridgeConnected}
         agentStatus={appState.agentStatus}
       />
