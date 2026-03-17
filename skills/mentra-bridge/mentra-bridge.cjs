@@ -29,15 +29,11 @@ const ECHO_WINDOW_MS = 8000;
 
 if (!API_KEY) { console.error('[bridge] MENTRAOS_API_KEY not set'); process.exit(1); }
 
-// -- Relay (lazy — file may not exist) --------------------------------------
-let relay = null;
-try {
-  const r = require('./relay-server.cjs');
-  relay = { create: r.createRelay, emit: r.emitToRelay };
-} catch (_e) { console.log('[bridge] relay-server.cjs not found — relay disabled'); }
+// -- Relay disabled (runs as separate pm2 process, IPC not yet wired) --------
+const relayEmit = null;
 
 function emitRelay(evt) {
-  if (relay && relay.emit) { try { relay.emit(evt); } catch (_) { /* */ } }
+  if (relayEmit) { try { relayEmit(evt); } catch (_) { /* */ } }
 }
 
 // -- SessionState -----------------------------------------------------------
