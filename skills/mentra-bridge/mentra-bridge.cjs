@@ -12,6 +12,8 @@
  *   - WebSocket relay integration for live webview data
  */
 const { AppServer } = require('@mentra/sdk');
+const fs = require('fs');
+const path = require('path');
 
 // -- Config -----------------------------------------------------------------
 const OPENCLAW_URL = process.env.OPENCLAW_URL || `http://localhost:${process.env.OPENCLAW_PORT || 18789}`;
@@ -19,13 +21,33 @@ const OPENCLAW_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || '';
 const MENTRA_PORT = parseInt(process.env.MENTRA_BRIDGE_PORT || '7010', 10);
 const PACKAGE_NAME = process.env.MENTRA_PACKAGE_NAME || 'mentra-claw';
 const API_KEY = process.env.MENTRAOS_API_KEY || process.env.MENTRA_API_KEY || '';
-const VISION_MODEL = process.env.MENTRA_VISION_MODEL || '';
 const MAX_DISPLAY = 220;
 const MAX_HISTORY = 20;
 const CTX_WINDOW = 10;
-const MAX_TOKENS = 256;
 const TIMEOUT_MS = 30000;
 const ECHO_WINDOW_MS = 8000;
+
+// -- Agent config from disk -------------------------------------------------
+const AGENT_DIR = path.join(process.env.HOME || '/home/aepod', '.openclaw', 'agents', 'main', 'agent');
+
+function loadJson(file, fallback) {
+  try { return JSON.parse(fs.readFileSync(path.join(AGENT_DIR, file), 'utf8')); }
+  catch { return fallback; }
+}
+function loadText(file, fallback) {
+  try { return fs.readFileSync(path.join(AGENT_DIR, file), 'utf8').trim(); }
+  catch { return fallback; }
+}
+
+const TTS_CONFIG = loadJson('tts.json', { voiceId: 'Wq15xSaY3gWvazBRaGEU', modelId: 'eleven_flash_v2_5' });
+const AGENT_CONFIG = loadJson('config.json', { maxTokens: 256, temperature: 0.7 });
+const SYSTEM_PROMPT = loadText('SYSTEM.md', 'You are ClawFT, a concise smart glasses AI assistant. Keep responses to 2-3 sentences.');
+const VISION_MODEL = AGENT_CONFIG.model?.vision || process.env.MENTRA_VISION_MODEL || '';
+const MAX_TOKENS = AGENT_CONFIG.maxTokens || 256;
+
+console.log(`[bridge] TTS voice=${TTS_CONFIG.voiceId} model=${TTS_CONFIG.modelId}`);
+console.log(`[bridge] System prompt: ${SYSTEM_PROMPT.substring(0, 60)}...`);
+console.log(`[bridge] Max tokens: ${MAX_TOKENS}, Vision: ${VISION_MODEL || '(default)'}`);
 
 if (!API_KEY) { console.error('[bridge] MENTRAOS_API_KEY not set'); process.exit(1); }
 
@@ -98,6 +120,9 @@ function toBase64(buf) { return Buffer.from(buf).toString('base64'); }
 async function queryOpenClaw(message, state, opts = {}) {
   const { imageBase64, model } = opts;
   const messages = [];
+  // System prompt from SYSTEM.md
+  if (SYSTEM_PROMPT) messages.push({ role: 'system', content: SYSTEM_PROMPT });
+  // Conversation context
   if (state) {
     for (const m of state.buildContext()) {
       if (m.content !== message) messages.push({ role: m.role, content: m.content });
@@ -151,7 +176,12 @@ class OpenClawBridge extends AppServer {
       if (!hasAudio || !controls.audioEnabled) return;
       state.startSpeaking(); state.recordSpoken(t);
       emitRelay({ type: 'tts', text: t, status: 'speaking' });
-      try { await session.audio.speak(t, { voice_id: 'Wq15xSaY3gWvazBRaGEU', model_id: 'eleven_flash_v2_5' }); emitRelay({ type: 'tts', text: t, status: 'done' }); }
+      try {
+        const ttsOpts = { voice_id: TTS_CONFIG.voiceId, model_id: TTS_CONFIG.modelId };
+        if (TTS_CONFIG.voiceSettings) ttsOpts.voice_settings = TTS_CONFIG.voiceSettings;
+        await session.audio.speak(t, ttsOpts);
+        emitRelay({ type: 'tts', text: t, status: 'done' });
+      }
       catch (e) { console.error('[bridge] TTS err:', e?.message); emitRelay({ type: 'tts', text: t, status: 'error' }); }
       finally { state.stopSpeaking(); }
     };
