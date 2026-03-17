@@ -11,6 +11,6 @@
       "packageName": { "type": "string", "default": "mentra-claw" },
       "port": { "type": "integer", "default": 7010 }
     },
-    "required": ["apiKey"]
+    "required": []
   }
 }
