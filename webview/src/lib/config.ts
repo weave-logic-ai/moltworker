@@ -75,11 +75,11 @@ export function getConfig(): AppConfig {
   const prod = isProduction();
   const origin = window.location.origin; // e.g. https://webview.aebots.org
 
-  // Everything same-origin in production via CF tunnel path rules
-  const healthUrl = prod ? `${origin}/api/health` : LOCAL_HEALTH;
+  // Same-origin in production via CF tunnel path rules (no prefix stripping)
+  const healthUrl = prod ? `${origin}/health` : LOCAL_HEALTH;
   const chatCompletionsUrl = urlParams.get('chat_api') || hashParams['chat_api'] ||
     import.meta.env.VITE_CHAT_API_URL ||
-    (prod ? `${origin}/api/v1/chat/completions` : LOCAL_CHAT_API);
+    (prod ? `${origin}/v1/chat/completions` : LOCAL_CHAT_API);
 
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const relayUrl = urlParams.get('relay_url') || hashParams['relay_url'] ||
