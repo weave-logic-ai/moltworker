@@ -144,8 +144,12 @@ async function queryOpenClaw(message, state, opts = {}) {
       try {
         const result = JSON.parse(stdout);
         // Capture session ID for conversation continuity
-        if (result.sessionId) userSessions.set(sessionKey, result.sessionId);
-        const content = result.message || result.content || result.choices?.[0]?.message?.content || 'No response';
+        const sid = result.result?.meta?.agentMeta?.sessionId || result.sessionId;
+        if (sid) userSessions.set(sessionKey, sid);
+        const content = result.result?.payloads?.[0]?.text
+          || result.message || result.content
+          || result.choices?.[0]?.message?.content
+          || 'No response';
         resolve(content);
       } catch {
         // If JSON parse fails, use raw output
