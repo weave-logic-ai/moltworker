@@ -14,11 +14,13 @@
 
 import type { BottomBarMode } from '@/types';
 import { navigate, homePath, workflowPath } from '@/lib/router';
+import { toggleMute } from '@/store/app-state';
 
 interface BottomBarProps {
   mode: BottomBarMode;
   activeTab: number;
   workflowId?: string;
+  muted?: boolean;
 }
 
 interface TabDef {
@@ -43,7 +45,7 @@ const WORKFLOW_TABS: TabDef[] = [
 const HOME_ROUTES: Array<'chat' | 'comms' | 'admin' | 'settings'> = ['chat', 'comms', 'admin', 'settings'];
 const WORKFLOW_ROUTE_SUFFIXES: Array<undefined | 'tasks' | 'files' | 'settings'> = [undefined, 'tasks', 'files', 'settings'];
 
-export function BottomBar({ mode, activeTab, workflowId }: BottomBarProps) {
+export function BottomBar({ mode, activeTab, workflowId, muted = false }: BottomBarProps) {
   const tabs = mode === 'workflow' ? WORKFLOW_TABS : HOME_TABS;
 
   const handleTabClick = (index: number) => {
@@ -63,7 +65,6 @@ export function BottomBar({ mode, activeTab, workflowId }: BottomBarProps) {
       width: '100%',
       maxWidth: '428px',
       display: 'flex',
-      justifyContent: 'space-around',
       alignItems: 'center',
       padding: '8px 0 env(safe-area-inset-bottom, 8px)',
       borderTop: '1px solid var(--border)',
@@ -71,54 +72,76 @@ export function BottomBar({ mode, activeTab, workflowId }: BottomBarProps) {
       zIndex: 20,
       transition: 'opacity 200ms ease',
     }}>
-      {tabs.map((tab, i) => {
-        const isActive = activeTab === i;
-        return (
-          <button
-            key={`${mode}-${tab.label}`}
-            onClick={() => handleTabClick(i)}
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '2px',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '4px 12px',
-              color: isActive ? 'var(--text)' : 'var(--text-subtle)',
-              transition: 'color 200ms ease',
-              position: 'relative',
-            }}
-          >
-            <span style={{
-              fontSize: '18px',
-              lineHeight: 1,
-              transition: 'color 200ms ease',
-            }}>
-              {tab.icon}
-            </span>
-            <span style={{
-              fontSize: '10px',
-              fontWeight: isActive ? 600 : 400,
-              transition: 'color 200ms ease, font-weight 200ms ease',
-            }}>
-              {tab.label}
-            </span>
-            {/* Active indicator underline */}
-            <span style={{
-              position: 'absolute',
-              bottom: 0,
-              left: '20%',
-              right: '20%',
-              height: '2px',
-              borderRadius: '1px',
-              background: isActive ? 'var(--accent)' : 'transparent',
-              transition: 'background 200ms ease',
-            }} />
-          </button>
-        );
-      })}
+      {/* Tabs */}
+      <div style={{ display: 'flex', flex: 1, justifyContent: 'space-around' }}>
+        {tabs.map((tab, i) => {
+          const isActive = activeTab === i;
+          return (
+            <button
+              key={`${mode}-${tab.label}`}
+              onClick={() => handleTabClick(i)}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '2px',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '4px 12px',
+                color: isActive ? 'var(--text)' : 'var(--text-subtle)',
+                transition: 'color 200ms ease',
+                position: 'relative',
+              }}
+            >
+              <span style={{ fontSize: '18px', lineHeight: 1 }}>{tab.icon}</span>
+              <span style={{
+                fontSize: '10px',
+                fontWeight: isActive ? 600 : 400,
+                transition: 'color 200ms ease',
+              }}>
+                {tab.label}
+              </span>
+              <span style={{
+                position: 'absolute',
+                bottom: 0,
+                left: '20%',
+                right: '20%',
+                height: '2px',
+                borderRadius: '1px',
+                background: isActive ? 'var(--accent)' : 'transparent',
+                transition: 'background 200ms ease',
+              }} />
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Mute toggle */}
+      <button
+        onClick={toggleMute}
+        title={muted ? 'Unmute' : 'Mute'}
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '2px',
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
+          padding: '4px 14px',
+          color: muted ? 'var(--destructive)' : 'var(--text-subtle)',
+          transition: 'color 200ms ease',
+          flexShrink: 0,
+        }}
+      >
+        <span style={{ fontSize: '18px', lineHeight: 1 }}>
+          {muted ? '\uD83D\uDD07' : '\uD83D\uDD0A'}
+        </span>
+        <span style={{ fontSize: '10px', fontWeight: 400 }}>
+          {muted ? 'Muted' : 'Audio'}
+        </span>
+      </button>
     </nav>
   );
 }

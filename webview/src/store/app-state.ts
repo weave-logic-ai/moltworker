@@ -29,6 +29,7 @@ export const DEFAULT_STATE: AppState = {
   glassesConnected: false,
   bridgeConnected: false,
   agentStatus: 'idle',
+  muted: false,
 };
 
 // ---------------------------------------------------------------------------
@@ -171,4 +172,9 @@ export function setConnectionStatus(glasses: boolean, bridge: boolean): void {
 /** Update agent status */
 export function setAgentStatus(status: AgentStatus): void {
   setState({ agentStatus: status });
+}
+
+/** Toggle mute state */
+export function toggleMute(): void {
+  setState({ muted: !state.muted });
 }

@@ -64,6 +64,9 @@ export interface AppState {
   glassesConnected: boolean;
   bridgeConnected: boolean;
   agentStatus: AgentStatus;
+
+  // Audio
+  muted: boolean;
 }
 
 // ---------------------------------------------------------------------------
