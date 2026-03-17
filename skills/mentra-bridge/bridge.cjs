@@ -101,8 +101,63 @@ function formatForGlasses(text) {
 
 function toBase64(buf) { return Buffer.from(buf).toString('base64'); }
 
-// -- 5. queryOpenClaw() — system prompt + conversation context ----------------
+// -- 5. queryOpenClaw() — routes through agent system for captured conversations
+const { execFile } = require('child_process');
+const OPENCLAW_BIN = '/opt/openclaw/openclaw.mjs';
+
+// Session ID per mentra user — persists conversation across requests
+const userSessions = new Map();
+
 async function queryOpenClaw(message, state, opts = {}) {
+  const { imageBase64, model } = opts;
+
+  // Derive a stable session key from the user
+  const sessionKey = state ? `mentra-${state.userId}` : `mentra-default`;
+  let sessionId = userSessions.get(sessionKey);
+
+  // Build the agent command
+  const args = ['agent', '--message', message, '--json'];
+  if (sessionId) args.push('--session-id', sessionId);
+  if (model) args.push('--agent', model);
+
+  // Note: image/multimodal not yet supported via CLI agent command.
+  // For vision queries, fall back to direct API
+  if (imageBase64) {
+    return await queryOpenClawDirect(message, state, opts);
+  }
+
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('Agent timeout')), TIMEOUT_MS);
+
+    execFile('node', [OPENCLAW_BIN, ...args], {
+      env: { ...process.env, OPENCLAW_GATEWAY_TOKEN: OPENCLAW_TOKEN },
+      timeout: TIMEOUT_MS,
+      maxBuffer: 1024 * 1024,
+    }, (err, stdout, stderr) => {
+      clearTimeout(timeout);
+      if (err) {
+        console.error('[bridge] Agent CLI error:', err.message);
+        // Fall back to direct API
+        queryOpenClawDirect(message, state, opts).then(resolve).catch(reject);
+        return;
+      }
+      try {
+        const result = JSON.parse(stdout);
+        // Capture session ID for conversation continuity
+        if (result.sessionId) userSessions.set(sessionKey, result.sessionId);
+        const content = result.message || result.content || result.choices?.[0]?.message?.content || 'No response';
+        resolve(content);
+      } catch {
+        // If JSON parse fails, use raw output
+        const text = stdout.trim();
+        resolve(text || 'No response');
+      }
+    });
+  });
+}
+
+// Fallback: direct API for vision queries and when CLI fails
+async function queryOpenClawDirect(message, state, opts = {}) {
   const { imageBase64, model } = opts;
   const messages = [];
   if (SYSTEM_PROMPT) messages.push({ role: 'system', content: SYSTEM_PROMPT });
