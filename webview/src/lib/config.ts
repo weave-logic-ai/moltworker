@@ -62,11 +62,16 @@ function parseHashParams(): Record<string, string> {
   return params;
 }
 
-/** Derive a WebSocket URL from the current page origin. */
-function deriveGatewayFromOrigin(): string {
+/**
+ * Derive the gateway WebSocket URL.
+ * The gateway runs on moltworker.aebots.org, not the webview host.
+ */
+function deriveGatewayUrl(): string {
   const loc = window.location;
   const protocol = loc.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${protocol}//${loc.host}`;
+  // Replace 'webview.' prefix with 'moltworker.' for the gateway
+  const gatewayHost = loc.host.replace(/^webview\./, 'moltworker.');
+  return `${protocol}//${gatewayHost}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -88,7 +93,7 @@ export function getConfig(): AppConfig {
     hashParams['gateway_url'] ||
     import.meta.env.VITE_GATEWAY_URL ||
     (window.location.hostname !== 'localhost'
-      ? deriveGatewayFromOrigin()
+      ? deriveGatewayUrl()
       : DEFAULT_GATEWAY_WS);
 
   // Relay URL: URL param > env > derive from origin (/relay/) > default
@@ -107,12 +112,16 @@ export function getConfig(): AppConfig {
     import.meta.env.VITE_GATEWAY_TOKEN ||
     null;
 
-  // Chat completions API
+  // Chat completions API — same host as gateway, HTTP(S) not WS
+  const defaultChatApi = window.location.hostname !== 'localhost'
+    ? `${window.location.protocol}//${window.location.host.replace(/^webview\./, 'moltworker.')}/v1/chat/completions`
+    : DEFAULT_CHAT_API;
+
   const chatCompletionsUrl =
     urlParams.get('chat_api') ||
     hashParams['chat_api'] ||
     import.meta.env.VITE_CHAT_API_URL ||
-    DEFAULT_CHAT_API;
+    defaultChatApi;
 
   _config = { gatewayUrl, relayUrl, gatewayToken, chatCompletionsUrl };
   return _config;
