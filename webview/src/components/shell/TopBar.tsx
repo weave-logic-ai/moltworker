@@ -51,14 +51,36 @@ export function TopBar({ breadcrumb, glassesConnected, agentStatus }: TopBarProp
     const { healthUrl } = getConfig();
     const check = async () => {
       try {
-        const res = await fetch(healthUrl, { signal: AbortSignal.timeout(5000) });
-        const data = await res.json();
-        if (active) setGatewayHealthy(data.ok === true);
-      } catch { if (active) setGatewayHealthy(false); }
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 5000);
+        const res = await fetch(healthUrl, { signal: controller.signal });
+        clearTimeout(timer);
+        if (res.ok) {
+          const data = await res.json();
+          if (active) setGatewayHealthy(data.ok === true);
+        } else {
+          if (active) setGatewayHealthy(false);
+        }
+      } catch {
+        if (active) setGatewayHealthy(false);
+      }
     };
     check();
-    const id = setInterval(check, 15000);
+    const id = setInterval(check, 10000);
     return () => { active = false; clearInterval(id); };
+  }, []);
+
+  const [debugMsg, setDebugMsg] = useState('...');
+
+  // Debug: show what health check is doing
+  useEffect(() => {
+    const { healthUrl } = getConfig();
+    setDebugMsg(`fetching: ${healthUrl}`);
+    fetch(healthUrl).then(r => r.json()).then(d => {
+      setDebugMsg(`ok:${d.ok} from ${healthUrl}`);
+    }).catch(e => {
+      setDebugMsg(`err: ${e.message} @ ${healthUrl}`);
+    });
   }, []);
 
   const breadcrumbText = breadcrumb.length > 0
@@ -112,13 +134,13 @@ export function TopBar({ breadcrumb, glassesConnected, agentStatus }: TopBarProp
           =
         </button>
         <span style={{
-          fontSize: '13px',
+          fontSize: '11px',
           color: 'var(--text-muted)',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',
         }}>
-          {breadcrumbText}
+          {debugMsg}
         </span>
       </div>
 
