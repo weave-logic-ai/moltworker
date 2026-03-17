@@ -248,7 +248,7 @@ export interface MentraSession {
   };
 
   audio: {
-    speak(text: string, opts?: { language?: string; voice?: string }): Promise<void>;
+    speak(text: string, opts?: { voice_id?: string; model_id?: string; voice_settings?: Record<string, unknown> }): Promise<void>;
     play(url: string, opts?: { volume?: number }): Promise<void>;
     stop(): Promise<void>;
   };

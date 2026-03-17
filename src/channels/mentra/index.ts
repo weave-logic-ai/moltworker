@@ -143,7 +143,12 @@ export class MentraChannel {
 // MentraAppServer
 // ---------------------------------------------------------------------------
 
-/** Internal AppServer. In production, extends @mentra/sdk AppServer. */
+/**
+ * Internal AppServer stub. In production this needs `extends AppServer`
+ * from '@mentra/sdk' to connect to MentraOS Cloud.  We do NOT import
+ * @mentra/sdk here because it is a runtime-only CommonJS dependency that
+ * is not available in the TypeScript build (see mentra-bridge.cjs).
+ */
 class MentraAppServer {
   private config: MentraChannelConfig;
   private openclawConfig: OpenClawGatewayConfig;
@@ -201,6 +206,12 @@ class MentraAppServer {
     const audio = new AudioPipeline(session, caps.hasSpeaker);
     this.audioPipelines.set(sessionId, audio);
 
+    // Wire echo detection: audio pipeline notifies session state of speaking changes
+    audio.onSpeakingChange = (speaking: boolean) => {
+      if (speaking) state.startSpeaking();
+      else state.stopSpeaking();
+    };
+
     // Create display helper
     const showText = createShowText(session, caps);
 
@@ -212,161 +223,188 @@ class MentraAppServer {
     await audio.playSound('connect');
 
     // -- Transcription (voice -> AI -> audio response) --------------------
-    session.events.onTranscription(async (data: TranscriptionData) => {
-      if (!data.isFinal) return;
+    // Guard: SDK doesn't guarantee all event handlers exist at runtime.
+    if (session.events.onTranscription) {
+      session.events.onTranscription(async (data: TranscriptionData) => {
+        if (!data.isFinal) return;
 
-      // Queue: prevent concurrent OpenClaw requests per session
-      if (!state.acquireProcessingLock()) {
-        console.log(`[mentra-session] Busy, queuing: "${data.text.substring(0, 40)}..."`);
-        return;
-      }
+        // Block transcription while speaking or in echo cooldown
+        if (state.shouldIgnoreTranscription()) {
+          console.log('[mentra-session] Speaking/cooldown, ignoring transcription');
+          return;
+        }
 
-      try {
-        // Record user message
-        state.addMessage('user', data.text);
-
-        await showText('Thinking...');
-
-        const response = await this.queryOpenClaw(data.text, state);
-        const formatted = buildResponse(response);
-
-        // Record assistant response
-        state.addMessage('assistant', response);
-
-        await showText(formatted.displayText);
-        await audio.speak(formatted.audioText);
-      } catch (err) {
-        console.error('[mentra-session] Transcription query failed:', (err as Error).message);
-        await audio.playSound('error');
-        await audio.speak('Sorry, something went wrong. Please try again.');
-      } finally {
-        state.releaseProcessingLock();
-      }
-    });
-
-    // -- Photo (camera -> AI vision -> audio) -----------------------------
-    session.events.onPhotoTaken(async (data: PhotoTakenData) => {
-      if (!state.acquireProcessingLock()) return;
-
-      try {
-        await showText('Analyzing...');
-        await audio.speak('Analyzing photo');
-
-        const base64 = arrayBufferToBase64(data.photoData);
-        const model = this.config.visionModel || undefined;
-        const response = await this.queryOpenClaw('What do you see? Be concise.', state, {
-          imageBase64: base64,
-          model,
-        });
-        const formatted = buildResponse(response);
-
-        state.addMessage('user', '[Photo taken] What do you see?');
-        state.addMessage('assistant', response);
-
-        await showText(formatted.displayText);
-        await audio.speak(formatted.audioText);
-      } catch (err) {
-        console.error('[mentra-session] Photo query failed:', (err as Error).message);
-        await audio.playSound('error');
-        await audio.speak('Could not analyze image. Please try again.');
-      } finally {
-        state.releaseProcessingLock();
-      }
-    });
-
-    // -- Button press ------------------------------------------------------
-    session.events.onButtonPress(async (data: ButtonPressData) => {
-      // Short press during audio -> interrupt (stop audio)
-      if (data.pressType === 'short' && audio.isPlaying) {
-        await audio.stopAudio();
-        return;
-      }
-
-      if (data.pressType === 'long') {
-        // Long press -> capture photo for AI analysis
-        await audio.speak('Capturing');
-
-        if (!state.acquireProcessingLock()) return;
+        // Queue: prevent concurrent OpenClaw requests per session
+        if (!state.acquireProcessingLock()) {
+          console.log(`[mentra-session] Busy, queuing: "${data.text.substring(0, 40)}..."`);
+          return;
+        }
 
         try {
-          const photo = await session.camera.requestPhoto({ purpose: 'AI analysis' });
-          const base64 = arrayBufferToBase64(photo.photoData);
-          const model = this.config.visionModel || undefined;
-          const response = await this.queryOpenClaw('What do you see? Describe briefly.', state, {
-            imageBase64: base64,
-            model,
-          });
+          // Record user message
+          state.addMessage('user', data.text);
+
+          await showText('Thinking...');
+
+          const response = await this.queryOpenClaw(data.text, state);
           const formatted = buildResponse(response);
 
-          state.addMessage('user', '[Long press photo] What do you see?');
+          // Record assistant response
           state.addMessage('assistant', response);
 
           await showText(formatted.displayText);
           await audio.speak(formatted.audioText);
         } catch (err) {
-          console.error('[mentra-session] Photo capture failed:', (err as Error).message);
+          console.error('[mentra-session] Transcription query failed:', (err as Error).message);
           await audio.playSound('error');
-          await audio.speak('Could not capture photo.');
+          await audio.speak('Sorry, something went wrong. Please try again.');
         } finally {
           state.releaseProcessingLock();
         }
-      } else {
-        // Short press (not during audio) -> listening feedback
-        await audio.speak('Listening');
-      }
-    });
+      });
+    }
+
+    // -- Photo (camera -> AI vision -> audio) -----------------------------
+    if (session.events.onPhotoTaken) {
+      session.events.onPhotoTaken(async (data: PhotoTakenData) => {
+        if (!state.acquireProcessingLock()) return;
+
+        try {
+          await showText('Analyzing...');
+          await audio.speak('Analyzing photo');
+
+          const base64 = arrayBufferToBase64(data.photoData);
+          const model = this.config.visionModel || undefined;
+          const response = await this.queryOpenClaw('What do you see? Be concise.', state, {
+            imageBase64: base64,
+            model,
+          });
+          const formatted = buildResponse(response);
+
+          state.addMessage('user', '[Photo taken] What do you see?');
+          state.addMessage('assistant', response);
+
+          await showText(formatted.displayText);
+          await audio.speak(formatted.audioText);
+        } catch (err) {
+          console.error('[mentra-session] Photo query failed:', (err as Error).message);
+          await audio.playSound('error');
+          await audio.speak('Could not analyze image. Please try again.');
+        } finally {
+          state.releaseProcessingLock();
+        }
+      });
+    }
+
+    // -- Button press ------------------------------------------------------
+    if (session.events.onButtonPress) {
+      session.events.onButtonPress(async (data: ButtonPressData) => {
+        // Short press during audio -> interrupt (stop audio)
+        if (data.pressType === 'short' && audio.isPlaying) {
+          await audio.stopAudio();
+          return;
+        }
+
+        if (data.pressType === 'long') {
+          // Long press -> capture photo for AI analysis
+          await audio.speak('Capturing');
+
+          if (!state.acquireProcessingLock()) return;
+
+          try {
+            const photo = await session.camera.requestPhoto({ purpose: 'AI analysis' });
+            const base64 = arrayBufferToBase64(photo.photoData);
+            const model = this.config.visionModel || undefined;
+            const response = await this.queryOpenClaw('What do you see? Describe briefly.', state, {
+              imageBase64: base64,
+              model,
+            });
+            const formatted = buildResponse(response);
+
+            state.addMessage('user', '[Long press photo] What do you see?');
+            state.addMessage('assistant', response);
+
+            await showText(formatted.displayText);
+            await audio.speak(formatted.audioText);
+          } catch (err) {
+            console.error('[mentra-session] Photo capture failed:', (err as Error).message);
+            await audio.playSound('error');
+            await audio.speak('Could not capture photo.');
+          } finally {
+            state.releaseProcessingLock();
+          }
+        } else {
+          // Short press (not during audio) -> listening feedback
+          await audio.speak('Listening');
+        }
+      });
+    }
 
     // -- Head position ----------------------------------------------------
-    session.events.onHeadPosition(async (_data: HeadPositionData) => {
-      state.touch();
-    });
+    if (session.events.onHeadPosition) {
+      session.events.onHeadPosition(async (_data: HeadPositionData) => {
+        state.touch();
+      });
+    }
 
     // -- Phone notifications ----------------------------------------------
-    session.events.onPhoneNotifications(async (notifications: PhoneNotification[]) => {
-      if (!notifications || notifications.length === 0) return;
+    if (session.events.onPhoneNotifications) {
+      session.events.onPhoneNotifications(async (notifications: PhoneNotification[]) => {
+        if (!notifications || notifications.length === 0) return;
 
-      for (const notif of notifications) {
-        console.log(`[mentra-session] Notification: [${notif.app}] ${notif.title}`);
-        if (notif.priority === 'high') {
-          await showText(`${notif.app}: ${notif.title}`);
-          await audio.playSound('notification');
-          await audio.speak(`${notif.app}: ${notif.title}`);
+        for (const notif of notifications) {
+          console.log(`[mentra-session] Notification: [${notif.app}] ${notif.title}`);
+          if (notif.priority === 'high') {
+            await showText(`${notif.app}: ${notif.title}`);
+            await audio.playSound('notification');
+            await audio.speak(`${notif.app}: ${notif.title}`);
+          }
         }
-      }
-    });
+      });
+    }
 
     // -- Battery status ---------------------------------------------------
-    session.events.onGlassesBattery(async (data: BatteryData) => {
-      if (data.batteryLevel !== undefined && data.batteryLevel <= 10) {
-        await audio.speak(`Low battery: ${data.batteryLevel} percent`);
-      }
-    });
+    if (session.events.onGlassesBattery) {
+      session.events.onGlassesBattery(async (data: BatteryData) => {
+        if (data.batteryLevel !== undefined && data.batteryLevel <= 10) {
+          await audio.speak(`Low battery: ${data.batteryLevel} percent`);
+        }
+      });
+    }
 
     // -- App-to-app messaging ---------------------------------------------
-    session.events.onAppMessage(async (_message: AppMessageData) => {
-      state.touch();
-    });
-    session.events.onAppUserJoined(async (_userId: string) => {});
-    session.events.onAppUserLeft(async (_userId: string) => {});
+    if (session.events.onAppMessage) {
+      session.events.onAppMessage(async (_message: AppMessageData) => {
+        state.touch();
+      });
+    }
+    if (session.events.onAppUserJoined) session.events.onAppUserJoined(async (_userId: string) => {});
+    if (session.events.onAppUserLeft) session.events.onAppUserLeft(async (_userId: string) => {});
 
     // -- Lifecycle events -------------------------------------------------
-    session.events.onDisconnected(() => {
-      this.activeSessions.delete(sessionId);
-      this.sessionStates.delete(sessionId);
-      this.audioPipelines.delete(sessionId);
-    });
+    if (session.events.onDisconnected) {
+      session.events.onDisconnected(() => {
+        this.activeSessions.delete(sessionId);
+        this.sessionStates.delete(sessionId);
+        this.audioPipelines.delete(sessionId);
+      });
+    }
 
-    session.events.onReconnected(() => {
-      this.activeSessions.set(sessionId, session);
-      // Re-create audio pipeline for the reconnected session
-      const reconnectedAudio = new AudioPipeline(session, caps.hasSpeaker);
-      this.audioPipelines.set(sessionId, reconnectedAudio);
-      reconnectedAudio.speak('Reconnected').catch(console.error);
-    });
+    if (session.events.onReconnected) {
+      session.events.onReconnected(() => {
+        this.activeSessions.set(sessionId, session);
+        // Re-create audio pipeline for the reconnected session
+        const reconnectedAudio = new AudioPipeline(session, caps.hasSpeaker);
+        this.audioPipelines.set(sessionId, reconnectedAudio);
+        reconnectedAudio.speak('Reconnected').catch(console.error);
+      });
+    }
 
-    session.events.onError((error: Error) => {
-      console.error(`[mentra-session] ${error.message}`);
-    });
+    if (session.events.onError) {
+      session.events.onError((error: Error) => {
+        console.error(`[mentra-session] ${error.message}`);
+      });
+    }
 
     try { session.dashboard?.content?.writeToMain('WeaveLogic AI - Active'); } catch { /* unsupported */ }
 

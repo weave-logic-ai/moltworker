@@ -35,6 +35,9 @@ const MAX_HISTORY_LENGTH = 20;
 /** Number of recent messages to include as context for OpenClaw requests */
 const CONTEXT_WINDOW_SIZE = 10;
 
+/** Cooldown in ms after TTS finishes before transcription is accepted again */
+const ECHO_COOLDOWN_MS = 3000;
+
 // ---------------------------------------------------------------------------
 // SessionState
 // ---------------------------------------------------------------------------
@@ -52,6 +55,8 @@ export class SessionState {
   private _messageCount = 0;
   private _lastActivity: number;
   private _capabilities: SessionCapabilities;
+  private _isSpeaking = false;
+  private _speakingEndAt = 0;
 
   readonly userId: string;
   readonly sessionId: string;
@@ -184,5 +189,42 @@ export class SessionState {
   /** Hardware capabilities snapshot */
   get capabilities(): Readonly<SessionCapabilities> {
     return this._capabilities;
+  }
+
+  // -----------------------------------------------------------------------
+  // Echo Detection (block transcription while TTS is active + cooldown)
+  // -----------------------------------------------------------------------
+
+  /**
+   * Mark that TTS has started speaking.
+   * While speaking, shouldIgnoreTranscription() returns true.
+   */
+  startSpeaking(): void {
+    this._isSpeaking = true;
+    this._speakingEndAt = 0;
+  }
+
+  /**
+   * Mark that TTS has finished speaking.
+   * Starts the echo cooldown period (ECHO_COOLDOWN_MS).
+   */
+  stopSpeaking(): void {
+    this._isSpeaking = false;
+    this._speakingEndAt = Date.now();
+  }
+
+  /** Whether TTS is currently speaking */
+  get isSpeaking(): boolean {
+    return this._isSpeaking;
+  }
+
+  /**
+   * Whether transcription should be ignored right now.
+   * Returns true if TTS is active or within the 3s echo cooldown window.
+   */
+  shouldIgnoreTranscription(): boolean {
+    if (this._isSpeaking) return true;
+    if (this._speakingEndAt && Date.now() - this._speakingEndAt < ECHO_COOLDOWN_MS) return true;
+    return false;
   }
 }

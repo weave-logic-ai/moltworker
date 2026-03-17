@@ -7,8 +7,8 @@ export function formatForGlasses(text: string): string {
     .replace(/#{1,6}\s/g, '')
     .replace(/\*\*(.*?)\*\*/g, '$1')
     .replace(/\*(.*?)\*/g, '$1')
-    .replace(/`(.*?)`/g, '$1')
     .replace(/```[\s\S]*?```/g, '[code]')
+    .replace(/`(.*?)`/g, '$1')
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
     .replace(/\n{3,}/g, '\n\n')
     .trim();

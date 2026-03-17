@@ -52,10 +52,19 @@ export class AudioPipeline {
   private hasSpeaker: boolean;
   private _isPlaying = false;
   private _isSpeaking = false;
+  private _onSpeakingChange?: (speaking: boolean) => void;
 
   constructor(session: MentraSession, hasSpeaker: boolean) {
     this.session = session;
     this.hasSpeaker = hasSpeaker;
+  }
+
+  /**
+   * Register a callback that fires when TTS speaking state changes.
+   * Used by SessionState to track speaking/cooldown for echo detection.
+   */
+  set onSpeakingChange(cb: ((speaking: boolean) => void) | undefined) {
+    this._onSpeakingChange = cb;
   }
 
   // -----------------------------------------------------------------------
@@ -68,13 +77,16 @@ export class AudioPipeline {
    * If audio is already playing, the current playback is stopped before
    * the new speak begins (interrupt behavior).
    *
+   * Notifies the onSpeakingChange callback so that session state can
+   * track speaking/cooldown for echo detection.
+   *
    * @param text - Text to speak
-   * @param options - Optional TTS configuration (language, voice)
+   * @param options - Optional TTS configuration (voice_id, model_id, voice_settings)
    * @returns true if speak completed successfully
    */
   async speak(
     text: string,
-    options?: { language?: string; voice?: string },
+    options?: { voice_id?: string; model_id?: string; voice_settings?: Record<string, unknown> },
   ): Promise<boolean> {
     if (!this.hasSpeaker) {
       console.log('[audio-pipeline] No speaker available, skipping TTS');
@@ -88,6 +100,7 @@ export class AudioPipeline {
 
     this._isSpeaking = true;
     this._isPlaying = true;
+    this._onSpeakingChange?.(true);
 
     try {
       await this.session.audio.speak(text, options);
@@ -101,6 +114,7 @@ export class AudioPipeline {
     } finally {
       this._isSpeaking = false;
       this._isPlaying = false;
+      this._onSpeakingChange?.(false);
     }
   }
 
