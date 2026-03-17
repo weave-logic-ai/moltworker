@@ -36,7 +36,7 @@ console.log(`[bridge] Max tokens: ${MAX_TOKENS}, Vision: ${VISION_MODEL || '(def
 if (!API_KEY) { console.error('[bridge] MENTRAOS_API_KEY not set'); process.exit(1); }
 
 // -- 2. Global controls (PTT, mic, audio — toggled via HTTP) ------------------
-const controls = { micEnabled: true, audioEnabled: true, pttMode: true, pttActive: false };
+const controls = { micEnabled: true, audioEnabled: true, pttMode: false, pttActive: false };
 
 // -- 3. SessionState (history, locks, echo detection) -------------------------
 class SessionState {
@@ -115,10 +115,10 @@ async function queryOpenClaw(message, state, opts = {}) {
   const sessionKey = state ? `mentra-${state.userId}` : `mentra-default`;
   let sessionId = userSessions.get(sessionKey);
 
-  // Build the agent command
-  const args = ['agent', '--message', message, '--json'];
+  // Build the agent command — --to creates/resumes a keyed session per user
+  const target = state ? `mentra-${state.userId.replace(/[^a-zA-Z0-9]/g, '-')}` : 'mentra-default';
+  const args = ['agent', '--to', target, '--message', message, '--json'];
   if (sessionId) args.push('--session-id', sessionId);
-  if (model) args.push('--agent', model);
 
   // Note: image/multimodal not yet supported via CLI agent command.
   // For vision queries, fall back to direct API
