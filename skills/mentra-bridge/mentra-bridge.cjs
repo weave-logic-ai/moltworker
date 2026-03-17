@@ -284,11 +284,6 @@ async function main() {
   app.get('/logs', (_, r) => r.type('text/plain').send(logBuf.join('\n')));
   app.get('/webview', (_, r) => r.send('<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>WeaveLogic AI</title><style>body{font-family:sans-serif;margin:0;padding:20px;background:#1a1a2e;color:#eee}h1{color:#e94560}.s{background:#16213e;padding:15px;border-radius:10px;margin:10px 0}</style></head><body><h1>WeaveLogic AI</h1><div class="s"><p><b>Status:</b> Connected</p><p><b>Model:</b> Gemini 2.0 Flash</p></div><div class="s"><p>Speak naturally. Long-press to capture photos.</p></div></body></html>'));
 
-  // Start relay alongside bridge
-  if (relay && relay.create) {
-    try { relay.create({ sessionStates }); } catch (e) { console.error('[bridge] Relay fail:', e.message); }
-  }
-
   await server.start();
   console.log(`[bridge] Running on :${MENTRA_PORT} pkg=${PACKAGE_NAME}`);
 
