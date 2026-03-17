@@ -1,8 +1,11 @@
 /**
  * Configuration reader for gateway and relay connections.
  *
- * Reads from URL params, URL hash fragment, or falls back to defaults.
- * No external dependencies.
+ * In production, everything goes through the same origin (webview.aebots.org)
+ * via Cloudflare Tunnel path rules to avoid CORS:
+ *   /api/*   -> localhost:18789 (OpenClaw gateway)
+ *   /relay/* -> localhost:3210  (Bridge relay WS)
+ *   /*       -> localhost:3200  (Webview static)
  */
 
 // ---------------------------------------------------------------------------
@@ -10,68 +13,52 @@
 // ---------------------------------------------------------------------------
 
 export interface AppConfig {
-  gatewayUrl: string;
+  /** Health check URL for the gateway */
+  healthUrl: string;
+  /** WebSocket URL for the bridge relay */
   relayUrl: string;
+  /** Gateway bearer token */
   gatewayToken: string | null;
+  /** REST URL for POST /v1/chat/completions */
   chatCompletionsUrl: string;
 }
 
 // ---------------------------------------------------------------------------
-// Defaults
+// Defaults (local dev)
 // ---------------------------------------------------------------------------
 
-const DEFAULT_GATEWAY_WS = 'ws://localhost:18789';
-const DEFAULT_RELAY_WS = 'ws://localhost:3210';
-
-/** Derive relay URL from current origin via /relay/ path */
-function deriveRelayFromOrigin(): string {
-  const loc = window.location;
-  const protocol = loc.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${protocol}//${loc.host}/relay/`;
-}
-const DEFAULT_CHAT_API = 'https://moltworker.aebots.org/v1/chat/completions';
+const LOCAL_HEALTH = 'http://localhost:18789/health';
+const LOCAL_RELAY = 'ws://localhost:3210';
+const LOCAL_CHAT_API = 'http://localhost:18789/v1/chat/completions';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Extract key=value pairs from the URL hash fragment after the path. */
 function parseHashParams(): Record<string, string> {
   const hash = window.location.hash;
   const params: Record<string, string> = {};
-  // Hash format: #/path?key=val&key=val  or  #token=val
   const qIdx = hash.indexOf('?');
   const fragment = qIdx >= 0 ? hash.slice(qIdx + 1) : '';
   if (!fragment) {
-    // Also check for #token=... format (no path)
     const eqIdx = hash.indexOf('=');
     if (eqIdx > 0 && !hash.includes('/')) {
-      const pairs = hash.slice(1).split('&');
-      for (const pair of pairs) {
+      for (const pair of hash.slice(1).split('&')) {
         const [k, v] = pair.split('=');
         if (k && v) params[k] = decodeURIComponent(v);
       }
     }
     return params;
   }
-  const pairs = fragment.split('&');
-  for (const pair of pairs) {
+  for (const pair of fragment.split('&')) {
     const [k, v] = pair.split('=');
     if (k && v) params[k] = decodeURIComponent(v);
   }
   return params;
 }
 
-/**
- * Derive the gateway WebSocket URL.
- * The gateway runs on moltworker.aebots.org, not the webview host.
- */
-function deriveGatewayUrl(): string {
-  const loc = window.location;
-  const protocol = loc.protocol === 'https:' ? 'wss:' : 'ws:';
-  // Replace 'webview.' prefix with 'moltworker.' for the gateway
-  const gatewayHost = loc.host.replace(/^webview\./, 'moltworker.');
-  return `${protocol}//${gatewayHost}`;
+function isProduction(): boolean {
+  return window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
 }
 
 // ---------------------------------------------------------------------------
@@ -80,54 +67,32 @@ function deriveGatewayUrl(): string {
 
 let _config: AppConfig | null = null;
 
-/** Read and cache configuration. Safe to call multiple times. */
 export function getConfig(): AppConfig {
   if (_config) return _config;
 
   const urlParams = new URLSearchParams(window.location.search);
   const hashParams = parseHashParams();
+  const prod = isProduction();
+  const origin = window.location.origin; // e.g. https://webview.aebots.org
 
-  // Gateway URL: URL param > env > derive from origin > default
-  const gatewayUrl =
-    urlParams.get('gateway_url') ||
-    hashParams['gateway_url'] ||
-    import.meta.env.VITE_GATEWAY_URL ||
-    (window.location.hostname !== 'localhost'
-      ? deriveGatewayUrl()
-      : DEFAULT_GATEWAY_WS);
-
-  // Relay URL: URL param > env > derive from origin (/relay/) > default
-  const relayUrl =
-    urlParams.get('relay_url') ||
-    hashParams['relay_url'] ||
-    import.meta.env.VITE_RELAY_URL ||
-    (window.location.hostname !== 'localhost'
-      ? deriveRelayFromOrigin()
-      : DEFAULT_RELAY_WS);
-
-  // Gateway token: hash param > URL param > env
-  const gatewayToken =
-    hashParams['token'] ||
-    urlParams.get('token') ||
-    import.meta.env.VITE_GATEWAY_TOKEN ||
-    null;
-
-  // Chat completions API — same host as gateway, HTTP(S) not WS
-  const defaultChatApi = window.location.hostname !== 'localhost'
-    ? `${window.location.protocol}//${window.location.host.replace(/^webview\./, 'moltworker.')}/v1/chat/completions`
-    : DEFAULT_CHAT_API;
-
-  const chatCompletionsUrl =
-    urlParams.get('chat_api') ||
-    hashParams['chat_api'] ||
+  // Everything same-origin in production via CF tunnel path rules
+  const healthUrl = prod ? `${origin}/api/health` : LOCAL_HEALTH;
+  const chatCompletionsUrl = urlParams.get('chat_api') || hashParams['chat_api'] ||
     import.meta.env.VITE_CHAT_API_URL ||
-    defaultChatApi;
+    (prod ? `${origin}/api/v1/chat/completions` : LOCAL_CHAT_API);
 
-  _config = { gatewayUrl, relayUrl, gatewayToken, chatCompletionsUrl };
+  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const relayUrl = urlParams.get('relay_url') || hashParams['relay_url'] ||
+    import.meta.env.VITE_RELAY_URL ||
+    (prod ? `${wsProtocol}//${window.location.host}/relay/` : LOCAL_RELAY);
+
+  const gatewayToken = hashParams['token'] || urlParams.get('token') ||
+    import.meta.env.VITE_GATEWAY_TOKEN || null;
+
+  _config = { healthUrl, relayUrl, gatewayToken, chatCompletionsUrl };
   return _config;
 }
 
-/** Reset cached config (useful for testing). */
 export function resetConfig(): void {
   _config = null;
 }

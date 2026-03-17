@@ -16,6 +16,7 @@ import { useState, useEffect } from 'react';
 import type { AgentStatus } from '@/types';
 import { toggleLeftDrawer, toggleRightDrawer } from '@/store/app-state';
 import { getRelayConnectionState, onRelayStateChange, type RelayConnectionState } from '@/lib/relay';
+import { getConfig } from '@/lib/config';
 
 interface TopBarProps {
   breadcrumb: string[];
@@ -44,12 +45,13 @@ export function TopBar({ breadcrumb, glassesConnected, agentStatus }: TopBarProp
 
   useEffect(() => onRelayStateChange((s) => setRelayState(s)), []);
 
-  // Poll gateway health via REST (no WS pairing needed)
+  // Poll gateway health via same-origin REST proxy
   useEffect(() => {
     let active = true;
+    const { healthUrl } = getConfig();
     const check = async () => {
       try {
-        const res = await fetch('https://moltworker.aebots.org/health', { signal: AbortSignal.timeout(5000) });
+        const res = await fetch(healthUrl, { signal: AbortSignal.timeout(5000) });
         const data = await res.json();
         if (active) setGatewayHealthy(data.ok === true);
       } catch { if (active) setGatewayHealthy(false); }
