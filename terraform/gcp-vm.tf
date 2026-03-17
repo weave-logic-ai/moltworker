@@ -21,8 +21,9 @@ resource "google_compute_instance" "moltworker" {
     }
   }
 
-  # VM startup script installs Node.js, pm2, openclaw, cloudflared
-  metadata_startup_script = file("${path.module}/scripts/startup.sh")
+  # Startup script removed — runs on EVERY boot and pegs CPU.
+  # Use scripts/setup-vm.sh manually for initial provisioning instead.
+  # metadata_startup_script = file("${path.module}/scripts/startup.sh")
 
   tags = ["moltworker", "http-server"]
 
