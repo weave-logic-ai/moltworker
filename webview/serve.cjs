@@ -18,6 +18,7 @@ const { createProxyServer } = require('http-proxy');
 const PORT = parseInt(process.env.WEBVIEW_PORT || '3200', 10);
 const GATEWAY_TARGET = process.env.GATEWAY_URL || 'http://localhost:18789';
 const RELAY_TARGET = process.env.RELAY_URL || 'http://localhost:3210';
+const BRIDGE_TARGET = process.env.BRIDGE_URL || 'http://localhost:7010';
 const DIST = path.join(__dirname, 'dist');
 
 const MIME = {
@@ -28,11 +29,18 @@ const MIME = {
 
 const gatewayProxy = createProxyServer({ target: GATEWAY_TARGET });
 const relayProxy = createProxyServer({ target: RELAY_TARGET, ws: true });
+const bridgeProxy = createProxyServer({ target: BRIDGE_TARGET });
 gatewayProxy.on('error', (err) => console.error('[proxy:gateway]', err.message));
 relayProxy.on('error', (err) => console.error('[proxy:relay]', err.message));
 
 const server = http.createServer((req, res) => {
   const url = req.url || '/';
+
+  // Proxy /control/* to bridge (mic/audio/ptt controls)
+  if (url.startsWith('/control')) {
+    bridgeProxy.web(req, res);
+    return;
+  }
 
   // Proxy /v1/* and /health to OpenClaw gateway
   if (url.startsWith('/v1/') || url.startsWith('/v1') || url === '/health') {

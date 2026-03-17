@@ -29,6 +29,16 @@ const ECHO_WINDOW_MS = 8000;
 
 if (!API_KEY) { console.error('[bridge] MENTRAOS_API_KEY not set'); process.exit(1); }
 
+// -- Global audio/mic controls (toggled via HTTP from webview) ----------------
+const controls = {
+  micEnabled: true,   // false = ignore all transcription
+  audioEnabled: true, // false = skip all speak() calls
+  pttMode: true,      // true = mic only active during PTT hold (DEFAULT)
+  pttActive: false,   // true = PTT button is being held right now
+};
+// NOTE: With pttMode=true and pttActive=false, NO transcription is processed
+// until the user holds the PTT button in the webview.
+
 // -- Relay disabled (runs as separate pm2 process, IPC not yet wired) --------
 const relayEmit = null;
 
@@ -138,7 +148,7 @@ class OpenClawBridge extends AppServer {
 
     const show = async (t) => { if (hasDisplay) try { await session.layouts.showTextWall(t); } catch (e) { console.log('[bridge] showText err:', e.message); } };
     const speak = async (t) => {
-      if (!hasAudio) return;
+      if (!hasAudio || !controls.audioEnabled) return;
       state.startSpeaking(); state.recordSpoken(t);
       emitRelay({ type: 'tts', text: t, status: 'speaking' });
       try { await session.audio.speak(t, { voice_id: 'Wq15xSaY3gWvazBRaGEU', model_id: 'eleven_flash_v2_5' }); emitRelay({ type: 'tts', text: t, status: 'done' }); }
@@ -160,6 +170,9 @@ class OpenClawBridge extends AppServer {
       session.events.onTranscription(async (data) => {
         emitRelay({ type: 'transcription', text: data.text, isFinal: data.isFinal, language: data.transcribeLanguage, confidence: data.confidence });
         if (!data.isFinal) return;
+        // Check mic controls
+        if (!controls.micEnabled) { return; }
+        if (controls.pttMode && !controls.pttActive) { return; }
         // Block all transcription while speaking or in 3s cooldown after TTS
         if (state.shouldIgnoreTranscription()) { console.log(`[bridge] Speaking/cooldown, ignoring transcription`); return; }
         if (!state.lock()) { console.log(`[bridge] Busy, skip`); return; }
@@ -283,6 +296,26 @@ async function main() {
   const _log = console.log; const _err = console.error;
   console.log = (...a) => { const m = a.map(x => typeof x === 'string' ? x : JSON.stringify(x)).join(' '); logBuf.push(m); if (logBuf.length > 200) logBuf.shift(); _log.apply(console, a); };
   console.error = (...a) => { const m = 'ERR: ' + a.map(x => typeof x === 'string' ? x : JSON.stringify(x)).join(' '); logBuf.push(m); if (logBuf.length > 200) logBuf.shift(); _err.apply(console, a); };
+
+  // Control endpoints (called by webview)
+  app.use(require('express').json());
+  app.get('/control', (_, r) => r.json(controls));
+  app.post('/control/mic', (req, r) => {
+    if (req.body.enabled !== undefined) controls.micEnabled = !!req.body.enabled;
+    console.log(`[bridge] Mic ${controls.micEnabled ? 'ENABLED' : 'DISABLED'}`);
+    r.json(controls);
+  });
+  app.post('/control/audio', (req, r) => {
+    if (req.body.enabled !== undefined) controls.audioEnabled = !!req.body.enabled;
+    console.log(`[bridge] Audio ${controls.audioEnabled ? 'ENABLED' : 'DISABLED'}`);
+    r.json(controls);
+  });
+  app.post('/control/ptt', (req, r) => {
+    if (req.body.mode !== undefined) controls.pttMode = !!req.body.mode;
+    if (req.body.active !== undefined) controls.pttActive = !!req.body.active;
+    console.log(`[bridge] PTT mode=${controls.pttMode} active=${controls.pttActive}`);
+    r.json(controls);
+  });
 
   app.get('/logs', (_, r) => r.type('text/plain').send(logBuf.join('\n')));
   app.get('/webview', (_, r) => r.send('<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>WeaveLogic AI</title><style>body{font-family:sans-serif;margin:0;padding:20px;background:#1a1a2e;color:#eee}h1{color:#e94560}.s{background:#16213e;padding:15px;border-radius:10px;margin:10px 0}</style></head><body><h1>WeaveLogic AI</h1><div class="s"><p><b>Status:</b> Connected</p><p><b>Model:</b> Gemini 2.0 Flash</p></div><div class="s"><p>Speak naturally. Long-press to capture photos.</p></div></body></html>'));

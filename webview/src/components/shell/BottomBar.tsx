@@ -55,28 +55,51 @@ export function BottomBar({ mode, activeTab, workflowId, micMuted, audioSilenced
     else navigate(i === 0 ? '/' : homePath(HOME_ROUTES[i]));
   };
 
-  // PTT handlers
+  // Send control command to bridge
+  const sendControl = (path: string, body: Record<string, unknown>) => {
+    fetch(`/control/${path}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }).catch(() => {});
+  };
+
+  // PTT handlers — tell bridge mic is active/inactive
   const handlePttDown = useCallback(() => {
     if (micMode === 'muted') return;
     setPttActive(true);
+    sendControl('ptt', { active: true });
     onPttDown?.();
     try { navigator.vibrate?.(30); } catch {}
   }, [micMode, onPttDown]);
 
   const handlePttUp = useCallback(() => {
     setPttActive(false);
+    sendControl('ptt', { active: false });
     onPttUp?.();
     try { navigator.vibrate?.(15); } catch {}
   }, [onPttUp]);
 
-  // Mic mode cycling
+  // Mic mode cycling — send to bridge
   const cycleMicMode = () => {
     const idx = MIC_MODES.indexOf(micMode);
     const next = MIC_MODES[(idx + 1) % MIC_MODES.length];
     setMicMode(next);
-    if (next === 'muted') toggleMicMute();
-    else if (micMuted) toggleMicMute(); // unmute
+    if (next === 'muted') {
+      toggleMicMute();
+      sendControl('mic', { enabled: false });
+    } else {
+      if (micMuted) toggleMicMute();
+      sendControl('mic', { enabled: true });
+      sendControl('ptt', { mode: next === 'ptt' });
+    }
     onMicModeChange?.(next);
+  };
+
+  // Audio toggle — also tell bridge
+  const handleAudioToggle = () => {
+    const newState = !audioSilenced;
+    toggleAudioSilence();
+    sendControl('audio', { enabled: !newState });
   };
 
   // PTT button color/state
@@ -150,7 +173,7 @@ export function BottomBar({ mode, activeTab, workflowId, micMuted, audioSilenced
 
         {/* Audio (right) */}
         <button
-          onClick={toggleAudioSilence}
+          onClick={handleAudioToggle}
           style={{
             width: '36px', height: '36px', borderRadius: '50%', cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
