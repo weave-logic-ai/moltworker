@@ -79,7 +79,7 @@ export function App() {
       <main style={{
         flex: 1,
         overflow: 'auto',
-        paddingBottom: '60px',
+        paddingBottom: '120px',
         paddingTop: '4px',
       }}>
         {isWorkflow ? (
