@@ -65,8 +65,12 @@ export interface AppState {
   bridgeConnected: boolean;
   agentStatus: AgentStatus;
 
-  // Audio
-  muted: boolean;
+  // Audio controls
+  micMuted: boolean;
+  audioSilenced: boolean;
+
+  // Sensor toggles (which sensors are enabled)
+  sensorToggles: Record<string, boolean>;
 }
 
 // ---------------------------------------------------------------------------

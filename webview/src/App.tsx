@@ -98,7 +98,8 @@ export function App() {
         mode={appState.bottomBarMode}
         activeTab={appState.activeTab}
         workflowId={routeMatch.params.workflowId}
-        muted={appState.muted}
+        micMuted={appState.micMuted}
+        audioSilenced={appState.audioSilenced}
       />
 
       {/* Left Drawer */}

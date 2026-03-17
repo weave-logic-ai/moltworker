@@ -29,7 +29,12 @@ export const DEFAULT_STATE: AppState = {
   glassesConnected: false,
   bridgeConnected: false,
   agentStatus: 'idle',
-  muted: false,
+  micMuted: false,
+  audioSilenced: false,
+  sensorToggles: {
+    mic: false, camera: false, button: false, speaker: false,
+    battery: false, wifi: false, location: false, imu: false,
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -174,7 +179,19 @@ export function setAgentStatus(status: AgentStatus): void {
   setState({ agentStatus: status });
 }
 
-/** Toggle mute state */
-export function toggleMute(): void {
-  setState({ muted: !state.muted });
+/** Toggle mic mute */
+export function toggleMicMute(): void {
+  setState({ micMuted: !state.micMuted });
+}
+
+/** Toggle audio silence */
+export function toggleAudioSilence(): void {
+  setState({ audioSilenced: !state.audioSilenced });
+}
+
+/** Toggle a sensor on/off */
+export function toggleSensor(sensorId: string): void {
+  setState({
+    sensorToggles: { ...state.sensorToggles, [sensorId]: !state.sensorToggles[sensorId] },
+  });
 }
