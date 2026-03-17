@@ -7,8 +7,9 @@
  */
 
 const mentraChannelPlugin = {
-  channelId: 'mentra',
-  displayName: 'Mentra Live',
+  id: 'mentra',
+  name: 'Mentra Live',
+  displayName: 'Mentra Live Smart Glasses',
   description: 'Smart glasses voice + vision channel via MentraOS SDK',
 
   capabilities: {
@@ -21,6 +22,21 @@ const mentraChannelPlugin = {
     delete: false,
   },
 
+  // Channel lifecycle
+  async start(config) {
+    console.log('[mentra-channel] Channel started', config);
+  },
+
+  async stop() {
+    console.log('[mentra-channel] Channel stopped');
+  },
+
+  // Status for dashboard
+  status() {
+    return { connected: true, label: 'Bridge running on :7010' };
+  },
+
+  // Send message to glasses (called by OpenClaw agent when replying)
   async send(to, text, opts) {
     console.log(`[mentra-channel] send to=${to} text="${text.substring(0, 50)}..."`);
     return { ok: true, messageId: `mentra-${Date.now()}` };
