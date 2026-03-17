@@ -1,0 +1,16 @@
+{
+  "id": "mentra",
+  "name": "@clawft/mentra",
+  "description": "Mentra Live smart glasses channel for OpenClaw",
+  "channels": ["mentra"],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "apiKey": { "type": "string", "description": "MentraOS Cloud API key" },
+      "packageName": { "type": "string", "default": "mentra-claw" },
+      "port": { "type": "integer", "default": 7010 }
+    },
+    "required": ["apiKey"]
+  }
+}

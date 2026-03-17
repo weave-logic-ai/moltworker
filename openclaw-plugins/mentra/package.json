@@ -1,0 +1,7 @@
+{
+  "name": "@clawft/mentra",
+  "version": "1.0.0",
+  "description": "Mentra Live smart glasses channel plugin for OpenClaw",
+  "main": "index.js",
+  "dependencies": {}
+}
