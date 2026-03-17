@@ -2,21 +2,33 @@
  * Workflow screen -- displayed when a workflow is active.
  *
  * Content varies by active tab:
- *   Tab 0 (Chat):     Workflow conversation (timeline view)
+ *   Tab 0 (Chat):     Live conversation via chat-store + gateway
  *   Tab 1 (Tasks):    Workflow-specific tasks
  *   Tab 2 (Files):    Workflow files and diffs
  *   Tab 3 (Settings): Workflow-scoped settings
  */
 
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   ConversationThread,
   TimelineEntry,
   UserMessage,
   AgentMessage,
-  ToolOutput,
-  ApprovalCard,
+  MessageInput,
 } from '../components/chat';
 import type { ConversationEntry } from '../components/chat';
+import {
+  getChatState,
+  subscribeChatState,
+  addMessage,
+  setAgentThinking,
+  setStreamingContent,
+  finalizeStream,
+  setChatError,
+  getMessagesForApi,
+  type ChatState,
+} from '@/store/chat-store';
+import { sendChatMessage, type ChatCompletionChunk } from '@/lib/gateway';
 
 interface WorkflowProps {
   workflowId: string;
@@ -34,123 +46,97 @@ export function Workflow({ workflowId, activeTab }: WorkflowProps) {
 }
 
 // ---------------------------------------------------------------------------
-// Sample data for Chat tab
+// Helpers
 // ---------------------------------------------------------------------------
 
-const SAMPLE_TIMESTAMP = Date.now() - 300_000; // 5 min ago
+function formatTime(ts: number): string {
+  return new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
 
-function buildSampleEntries(): ConversationEntry[] {
-  return [
-    {
-      id: 'status-1',
-      type: 'status',
-      timestamp: SAMPLE_TIMESTAMP,
+// ---------------------------------------------------------------------------
+// Tab 0: Chat (Live Conversation)
+// ---------------------------------------------------------------------------
+
+function WorkflowChat({ workflowId }: { workflowId: string }) {
+  const [chatState, setChatState] = useState<ChatState>(getChatState());
+  const abortRef = useRef<AbortController | null>(null);
+  const sendStartRef = useRef<number>(0);
+
+  useEffect(() => {
+    return subscribeChatState((s) => setChatState(s));
+  }, []);
+
+  // Build conversation entries from live data
+  const entries: ConversationEntry[] = chatState.messages.map((msg) => {
+    const time = formatTime(msg.timestamp);
+    if (msg.role === 'user') {
+      return {
+        id: msg.id,
+        type: 'user' as const,
+        timestamp: msg.timestamp,
+        content: (
+          <TimelineEntry timestamp={time} dotColor="default">
+            <UserMessage content={msg.content} timestamp={time} />
+          </TimelineEntry>
+        ),
+      };
+    }
+    // assistant
+    const latencyLabel = msg.latencyMs
+      ? ` (${(msg.latencyMs / 1000).toFixed(1)}s)`
+      : '';
+    return {
+      id: msg.id,
+      type: 'agent' as const,
+      timestamp: msg.timestamp,
       content: (
-        <TimelineEntry timestamp="9:12 PM" dotColor="success">
-          <div style={{
-            fontSize: '12px',
-            color: 'var(--text-subtle)',
-            fontStyle: 'italic',
-          }}>
-            Workflow started by Adrian
-          </div>
-        </TimelineEntry>
-      ),
-    },
-    {
-      id: 'user-1',
-      type: 'user',
-      timestamp: SAMPLE_TIMESTAMP + 10_000,
-      content: (
-        <TimelineEntry timestamp="9:12 PM" dotColor="default">
-          <UserMessage
-            content="Refactor the auth service to use JWT with refresh token rotation. Replace the current session-based auth."
-            timestamp="9:12 PM"
+        <TimelineEntry timestamp={time} dotColor="success">
+          <AgentMessage
+            agentName={msg.model || 'OpenClaw'}
+            content={msg.content}
+            timestamp={`${time}${latencyLabel}`}
+            status="idle"
+            initials="OC"
           />
         </TimelineEntry>
       ),
-    },
-    {
-      id: 'agent-1',
+    };
+  });
+
+  // If agent is streaming, add a streaming entry
+  if (chatState.streamingContent) {
+    const streamEntry: ConversationEntry = {
+      id: 'streaming',
       type: 'agent',
-      timestamp: SAMPLE_TIMESTAMP + 60_000,
+      timestamp: Date.now(),
       content: (
-        <TimelineEntry timestamp="9:13 PM" dotColor="success">
+        <TimelineEntry timestamp="now" dotColor="accent" isActive>
           <AgentMessage
-            agentName="coder-alpha"
-            content="Understood. I'll structure this as a **3-phase migration**: (1) add JWT layer alongside sessions, (2) migrate endpoints, (3) deprecate sessions. Starting with the token service."
-            timestamp="9:13 PM"
-            status="idle"
-            initials="C"
+            agentName={chatState.streamingModel || 'OpenClaw'}
+            content={chatState.streamingContent}
+            timestamp="streaming..."
+            status="executing"
+            initials="OC"
           />
         </TimelineEntry>
       ),
-    },
-    {
-      id: 'tool-1',
-      type: 'tool',
-      timestamp: SAMPLE_TIMESTAMP + 120_000,
-      content: (
-        <TimelineEntry timestamp="9:14 PM" dotColor="default">
-          <AgentMessage
-            agentName="coder-alpha"
-            content="Created token service with rotation logic."
-            timestamp="9:14 PM"
-            status="idle"
-            initials="C"
-          />
-          <div style={{ paddingLeft: '30px' }}>
-            <ToolOutput
-              toolName="src/auth/token-service.ts"
-              output={`export class TokenService {
-  private readonly secret: string;
-  private readonly accessTTL = '15m';
-  private readonly refreshTTL = '7d';
-
-  async generatePair(userId: string) {
-    const access = await this.sign(
-      { sub: userId, type: 'access' },
-      this.accessTTL
-    );
-    const refresh = await this.sign(
-      { sub: userId, type: 'refresh' },
-      this.refreshTTL
-    );
-    return { access, refresh };
+    };
+    entries.push(streamEntry);
   }
-}`}
-            />
-          </div>
-        </TimelineEntry>
-      ),
-    },
-    {
-      id: 'agent-2',
+
+  // If agent is thinking (no content yet), show thinking dots
+  if (chatState.isAgentThinking && !chatState.streamingContent) {
+    const thinkingEntry: ConversationEntry = {
+      id: 'thinking',
       type: 'agent',
-      timestamp: SAMPLE_TIMESTAMP + 180_000,
+      timestamp: Date.now(),
       content: (
-        <TimelineEntry timestamp="9:18 PM" dotColor="default">
-          <AgentMessage
-            agentName="scout-recon"
-            content="Found **14 endpoints** using session auth. 3 also pass tokens to external services and will need special handling."
-            timestamp="9:18 PM"
-            status="idle"
-            initials="S"
-          />
-        </TimelineEntry>
-      ),
-    },
-    {
-      id: 'approval-1',
-      type: 'approval',
-      timestamp: SAMPLE_TIMESTAMP + 240_000,
-      content: (
-        <TimelineEntry timestamp="9:20 PM" dotColor="accent" isActive>
+        <TimelineEntry timestamp="now" dotColor="accent" isActive isLast>
           <div style={{
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            marginBottom: '6px',
+            padding: '4px 20px 12px',
           }}>
             <span style={{
               width: '20px',
@@ -165,76 +151,78 @@ function buildSampleEntries(): ConversationEntry[] {
               color: 'var(--text-muted)',
               flexShrink: 0,
             }}>
-              R
+              OC
             </span>
-            <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-muted)' }}>
-              reviewer-sec
-            </span>
-          </div>
-          <ApprovalCard
-            question="Ready to apply changes to 14 endpoints. This will modify auth handling across the entire API surface. Proceed?"
-            showEdit
-          />
-        </TimelineEntry>
-      ),
-    },
-    {
-      id: 'thinking-1',
-      type: 'agent',
-      timestamp: SAMPLE_TIMESTAMP + 300_000,
-      content: (
-        <TimelineEntry timestamp="now" dotColor="accent" isActive isLast>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            marginBottom: '6px',
-          }}>
-            <span style={{
-              width: '20px',
-              height: '20px',
-              borderRadius: '50%',
-              border: '2px solid var(--success)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '8px',
-              fontWeight: 700,
-              color: 'var(--text-muted)',
-              flexShrink: 0,
-            }}>
-              W
-            </span>
-            <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-muted)' }}>
-              worker-3
-            </span>
-          </div>
-          <div style={{ display: 'flex', gap: '4px', padding: '4px 0' }}>
-            <span className="animate-thinking" style={{
-              width: '4px', height: '4px', borderRadius: '50%',
-              background: 'var(--text-subtle)', animationDelay: '0s',
-            }} />
-            <span className="animate-thinking" style={{
-              width: '4px', height: '4px', borderRadius: '50%',
-              background: 'var(--text-subtle)', animationDelay: '0.16s',
-            }} />
-            <span className="animate-thinking" style={{
-              width: '4px', height: '4px', borderRadius: '50%',
-              background: 'var(--text-subtle)', animationDelay: '0.32s',
-            }} />
+            <div style={{ display: 'flex', gap: '4px', padding: '4px 0' }}>
+              <span className="animate-thinking" style={{
+                width: '4px', height: '4px', borderRadius: '50%',
+                background: 'var(--text-subtle)', animationDelay: '0s',
+              }} />
+              <span className="animate-thinking" style={{
+                width: '4px', height: '4px', borderRadius: '50%',
+                background: 'var(--text-subtle)', animationDelay: '0.16s',
+              }} />
+              <span className="animate-thinking" style={{
+                width: '4px', height: '4px', borderRadius: '50%',
+                background: 'var(--text-subtle)', animationDelay: '0.32s',
+              }} />
+            </div>
           </div>
         </TimelineEntry>
       ),
-    },
-  ];
-}
+    };
+    entries.push(thinkingEntry);
+  }
 
-// ---------------------------------------------------------------------------
-// Tab 0: Chat (Workflow Conversation)
-// ---------------------------------------------------------------------------
+  // Handle user sending a message
+  const handleSend = useCallback((text: string) => {
+    // Add user message to store
+    addMessage({
+      role: 'user',
+      content: text,
+      timestamp: Date.now(),
+    });
 
-function WorkflowChat({ workflowId }: { workflowId: string }) {
-  const entries = buildSampleEntries();
+    setAgentThinking(true);
+    sendStartRef.current = Date.now();
+
+    // Build messages array for API
+    const apiMessages = getMessagesForApi();
+
+    // Send to gateway chat completions
+    let accumulated = '';
+    abortRef.current = sendChatMessage(
+      apiMessages.map((m) => ({
+        role: m.role as 'user' | 'assistant' | 'system',
+        content: m.content,
+      })),
+      {
+        onChunk: (chunk: ChatCompletionChunk) => {
+          const delta = chunk.choices?.[0]?.delta?.content;
+          if (delta) {
+            accumulated += delta;
+            setStreamingContent(accumulated, chunk.model);
+          }
+        },
+        onDone: (_fullContent: string, model: string) => {
+          const latencyMs = Date.now() - sendStartRef.current;
+          finalizeStream(model, latencyMs);
+          abortRef.current = null;
+        },
+        onError: (err: Error) => {
+          setChatError(err.message);
+          abortRef.current = null;
+        },
+      },
+    );
+  }, []);
+
+  // Cleanup abort on unmount
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -242,12 +230,56 @@ function WorkflowChat({ workflowId }: { workflowId: string }) {
       <div className="content-padding" style={{ paddingTop: '12px', paddingBottom: '16px', flexShrink: 0 }}>
         <h1 className="text-section-title">Workflow {workflowId}</h1>
         <div className="text-meta" style={{ marginTop: '4px' }}>
-          Active conversation
+          {chatState.messages.length > 0
+            ? `${chatState.messages.length} messages`
+            : 'Start a conversation'}
         </div>
       </div>
 
       {/* Conversation thread */}
-      <ConversationThread entries={entries} />
+      {entries.length > 0 ? (
+        <ConversationThread entries={entries} />
+      ) : (
+        <div style={{
+          flex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexDirection: 'column',
+          gap: '8px',
+          padding: '40px 20px',
+        }}>
+          <div style={{
+            width: '48px',
+            height: '48px',
+            borderRadius: '50%',
+            border: '2px solid var(--text-subtle)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '16px',
+            fontWeight: 600,
+          }}>
+            OC
+          </div>
+          <p className="text-secondary" style={{ textAlign: 'center' }}>
+            Send a message to start the conversation
+          </p>
+        </div>
+      )}
+
+      {/* Error banner */}
+      {chatState.lastError && (
+        <div style={{
+          padding: '8px 20px',
+          background: 'rgba(239,68,68,0.1)',
+          borderTop: '1px solid var(--destructive)',
+          fontSize: '12px',
+          color: 'var(--destructive)',
+        }}>
+          {chatState.lastError}
+        </div>
+      )}
 
       {/* Input area */}
       <div style={{
@@ -257,22 +289,10 @@ function WorkflowChat({ workflowId }: { workflowId: string }) {
         background: 'var(--bg)',
         flexShrink: 0,
       }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          padding: '10px 14px',
-          border: '1px solid var(--border-strong)',
-          borderRadius: 'var(--radius)',
-          background: 'transparent',
-        }}>
-          <span style={{ color: 'var(--text-subtle)', fontSize: '14px', flex: 1 }}>
-            Type a message...
-          </span>
-          <span style={{ color: 'var(--text-subtle)', fontSize: '16px', cursor: 'pointer' }}>
-            mic
-          </span>
-        </div>
+        <MessageInput
+          onSend={handleSend}
+          disabled={chatState.isAgentThinking}
+        />
       </div>
     </div>
   );

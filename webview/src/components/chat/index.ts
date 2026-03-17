@@ -11,3 +11,4 @@ export type { TimelineDotColor } from './TimelineEntry';
 export { ApprovalCard } from './ApprovalCard';
 export type { ApprovalStatus } from './ApprovalCard';
 export { ToolOutput } from './ToolOutput';
+export { MessageInput } from './MessageInput';

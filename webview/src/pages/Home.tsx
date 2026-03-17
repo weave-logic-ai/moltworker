@@ -2,16 +2,24 @@
  * Home screen -- displayed when no workflow is active.
  *
  * Content varies by active tab:
- *   Tab 0 (Chat):     Greeting, agent status, quick actions, recent workflows,
+ *   Tab 0 (Chat):     Greeting, live agent status, quick actions, recent workflows,
  *                      notifications with priority coloring
  *   Tab 1 (Comms):    Communication officer placeholder
- *   Tab 2 (Admin):    Server management placeholder
+ *   Tab 2 (Admin):    Server management with live service health
  *   Tab 3 (Settings): Global settings placeholder
  */
 
+import { useState, useEffect } from 'react';
 import { navigate, workflowPath } from '@/lib/router';
-import { enterWorkflow, closeAllOverlays } from '@/store/app-state';
-import type { Workflow } from '@/types';
+import { enterWorkflow, closeAllOverlays, getState, subscribe } from '@/store/app-state';
+import {
+  getSensorState,
+  subscribeSensorState,
+  type SensorState,
+} from '@/store/sensor-store';
+import { getConnectionState, onStateChange, type GatewayConnectionState } from '@/lib/gateway';
+import { getRelayConnectionState, onRelayStateChange, type RelayConnectionState } from '@/lib/relay';
+import type { Workflow, AppState } from '@/types';
 
 // ---------------------------------------------------------------------------
 // Shared sample data (same as LeftDrawer)
@@ -40,14 +48,102 @@ export function Home({ activeTab }: HomeProps) {
 }
 
 // ---------------------------------------------------------------------------
+// Hooks
+// ---------------------------------------------------------------------------
+
+function useAppState(): AppState {
+  const [s, setS] = useState<AppState>(getState());
+  useEffect(() => subscribe((next) => setS(next)), []);
+  return s;
+}
+
+function useSensorState(): SensorState {
+  const [s, setS] = useState<SensorState>(getSensorState());
+  useEffect(() => subscribeSensorState((next) => setS(next)), []);
+  return s;
+}
+
+function useGatewayState(): GatewayConnectionState {
+  const [s, setS] = useState<GatewayConnectionState>(getConnectionState());
+  useEffect(() => onStateChange((next) => setS(next)), []);
+  return s;
+}
+
+function useRelayState(): RelayConnectionState {
+  const [s, setS] = useState<RelayConnectionState>(getRelayConnectionState());
+  useEffect(() => onRelayStateChange((next) => setS(next)), []);
+  return s;
+}
+
+// ---------------------------------------------------------------------------
+// Connection status helpers
+// ---------------------------------------------------------------------------
+
+interface ConnectionInfo {
+  label: string;
+  color: string;
+}
+
+function gatewayInfo(s: GatewayConnectionState): ConnectionInfo {
+  switch (s) {
+    case 'connected': return { label: 'Connected', color: 'var(--success)' };
+    case 'connecting': return { label: 'Connecting...', color: 'var(--warning)' };
+    case 'error': return { label: 'Error', color: 'var(--destructive)' };
+    default: return { label: 'Disconnected', color: 'var(--text-subtle)' };
+  }
+}
+
+function relayInfo(s: RelayConnectionState): ConnectionInfo {
+  switch (s) {
+    case 'connected': return { label: 'Connected', color: 'var(--success)' };
+    case 'connecting': return { label: 'Connecting...', color: 'var(--warning)' };
+    case 'error': return { label: 'Error', color: 'var(--destructive)' };
+    default: return { label: 'Disconnected', color: 'var(--text-subtle)' };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Tab 0: Chat / Home
 // ---------------------------------------------------------------------------
 
 function HomeChat() {
+  const appState = useAppState();
+  const sensorState = useSensorState();
+  const gwState = useGatewayState();
+  const relayState = useRelayState();
+
+  const gw = gatewayInfo(gwState);
+  const rl = relayInfo(relayState);
+  const glassesConnected = appState.glassesConnected;
+
+  const agentStatusLabel = appState.agentStatus === 'idle'
+    ? gw.label
+    : appState.agentStatus.charAt(0).toUpperCase() + appState.agentStatus.slice(1);
+
+  const agentDotColor = gwState === 'connected'
+    ? 'var(--success)'
+    : gwState === 'connecting'
+      ? 'var(--warning)'
+      : 'var(--destructive)';
+
   const handleWorkflowClick = (wf: Workflow) => {
     enterWorkflow(wf);
     navigate(workflowPath(wf.id));
     closeAllOverlays();
+  };
+
+  const handleNewConversation = () => {
+    const id = `conv-${Date.now()}`;
+    const wf: Workflow = {
+      id,
+      projectId: 'default',
+      name: 'New Conversation',
+      status: 'active',
+      messageCount: 0,
+      lastActivity: 'now',
+    };
+    enterWorkflow(wf);
+    navigate(workflowPath(id));
   };
 
   return (
@@ -71,7 +167,7 @@ function HomeChat() {
           width: '48px',
           height: '48px',
           borderRadius: '50%',
-          border: '2px solid var(--text-subtle)',
+          border: `2px solid ${agentDotColor}`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -83,12 +179,41 @@ function HomeChat() {
         </div>
         <div style={{ flex: 1 }}>
           <div className="text-body" style={{ fontWeight: 500 }}>OpenClaw Agent</div>
-          <div className="text-secondary">Idle</div>
+          <div className="text-secondary">{agentStatusLabel}</div>
         </div>
-        <span className="status-dot status-dot--success" style={{ marginRight: '4px' }} />
+        <span className="status-dot" style={{ background: agentDotColor, marginRight: '4px' }} />
       </div>
 
-      {/* Quick actions -- horizontal scrollable pills */}
+      {/* Connection summary */}
+      <div style={{
+        display: 'flex',
+        gap: '16px',
+        padding: '8px 0',
+      }}>
+        <ConnectionPill label="Gateway" info={gw} />
+        <ConnectionPill label="Bridge" info={rl} />
+        <ConnectionPill
+          label="Glasses"
+          info={{
+            label: glassesConnected ? 'Connected' : 'Offline',
+            color: glassesConnected ? 'var(--success)' : 'var(--text-subtle)',
+          }}
+        />
+      </div>
+
+      {/* Battery (if relay connected) */}
+      {sensorState.battery.level > 0 && (
+        <div style={{
+          padding: '6px 0',
+          fontSize: '12px',
+          color: 'var(--text-muted)',
+        }}>
+          Battery: {sensorState.battery.level}%
+          {sensorState.battery.charging ? ' (charging)' : ''}
+        </div>
+      )}
+
+      {/* Quick actions */}
       <div className="section-gap-lg">
         <div className="text-section-label" style={{ marginBottom: '10px' }}>Quick Actions</div>
         <div style={{
@@ -99,14 +224,14 @@ function HomeChat() {
           paddingBottom: '4px',
           scrollbarWidth: 'none',
         }}>
-          <button className="pill">+ New Workflow</button>
+          <button className="pill" onClick={handleNewConversation}>+ New Conversation</button>
           <button className="pill">Resume Last</button>
           <button className="pill">View Notifications</button>
           <button className="pill">Run Diagnostics</button>
         </div>
       </div>
 
-      {/* Recent workflows -- using shared sample data */}
+      {/* Recent workflows */}
       <div className="section-gap-lg">
         <div className="text-section-label" style={{ marginBottom: '10px' }}>Recent Workflows</div>
         {SAMPLE_WORKFLOWS.map((wf) => (
@@ -158,10 +283,18 @@ function HomeComms() {
 }
 
 // ---------------------------------------------------------------------------
-// Tab 2: Admin
+// Tab 2: Admin (with live service health)
 // ---------------------------------------------------------------------------
 
 function HomeAdmin() {
+  const sensorState = useSensorState();
+  const gwState = useGatewayState();
+  const relayState = useRelayState();
+
+  const gwHealth = gwState === 'connected' ? 'running' : gwState === 'connecting' ? 'connecting' : 'offline';
+  const relayHealth = relayState === 'connected' ? 'running' : relayState === 'connecting' ? 'connecting' : 'offline';
+  const glassesHealth = sensorState.servicesHealth.glasses === 'up' ? 'connected' : 'offline';
+
   return (
     <div className="content-padding" style={{ paddingTop: '20px' }}>
       <h1 className="text-page-title">Administration</h1>
@@ -172,9 +305,9 @@ function HomeAdmin() {
       {/* Service status */}
       <div className="section-gap-lg">
         <div className="text-section-label" style={{ marginBottom: '10px' }}>Services</div>
-        <ServiceItem name="OpenClaw Gateway" version="2026.3.13" status="running" />
-        <ServiceItem name="Mentra Bridge" version="1.0.0" status="running" />
-        <ServiceItem name="Cloudflare Tunnel" version="--" status="connected" />
+        <ServiceItem name="OpenClaw Gateway" version="2026.3.13" status={gwHealth} />
+        <ServiceItem name="Mentra Bridge" version="1.0.0" status={relayHealth} />
+        <ServiceItem name="Mentra Glasses" version="--" status={glassesHealth} />
       </div>
 
       {/* Quick actions */}
@@ -215,6 +348,26 @@ function HomeSettings() {
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
+
+function ConnectionPill({ label, info }: { label: string; info: ConnectionInfo }) {
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      fontSize: '11px',
+    }}>
+      <span style={{
+        width: '6px',
+        height: '6px',
+        borderRadius: '50%',
+        background: info.color,
+        flexShrink: 0,
+      }} />
+      <span style={{ color: 'var(--text-subtle)' }}>{label}</span>
+    </div>
+  );
+}
 
 function WorkflowListItem({ workflow, onClick }: {
   workflow: Workflow;
@@ -280,18 +433,32 @@ function ServiceItem({ name, version, status }: {
   version: string;
   status: string;
 }) {
+  const statusColor =
+    status === 'running' || status === 'connected'
+      ? 'var(--success)'
+      : status === 'connecting'
+        ? 'var(--warning)'
+        : 'var(--destructive)';
+
+  const statusDotClass =
+    status === 'running' || status === 'connected'
+      ? 'status-dot--success'
+      : status === 'connecting'
+        ? 'status-dot--warning'
+        : 'status-dot--error';
+
   return (
     <div className="ghost-border" style={{
       display: 'flex',
       alignItems: 'center',
       padding: '10px 0',
     }}>
-      <span className="status-dot status-dot--success" style={{ marginRight: '10px' }} />
+      <span className={`status-dot ${statusDotClass}`} style={{ marginRight: '10px' }} />
       <div style={{ flex: 1 }}>
         <div className="text-body">{name}</div>
         <div className="text-meta">{version}</div>
       </div>
-      <span className="text-meta" style={{ color: 'var(--success)' }}>{status}</span>
+      <span className="text-meta" style={{ color: statusColor }}>{status}</span>
     </div>
   );
 }

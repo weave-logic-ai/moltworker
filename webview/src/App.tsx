@@ -1,12 +1,16 @@
 /**
  * App shell with router, top bar, bottom bar, left/right drawer shells.
  * Follows the layout from docs/UI/app-structure.md.
+ *
+ * Initializes gateway and relay WebSocket connections on mount.
  */
 
 import { useState, useEffect, useCallback } from 'react';
 import type { AppState } from '@/types';
 import { getHashPath, matchRoute, onRouteChange, isWorkflowRoute, getTabFromPath } from '@/lib/router';
 import { getState, subscribe, setActiveTab, closeAllOverlays } from '@/store/app-state';
+import { connect as connectGateway, disconnect as disconnectGateway } from '@/lib/gateway';
+import { connect as connectRelay, disconnect as disconnectRelay } from '@/lib/relay';
 import { TopBar } from '@/components/shell/TopBar';
 import { BottomBar } from '@/components/shell/BottomBar';
 import { LeftDrawer } from '@/components/shell/LeftDrawer';
@@ -38,6 +42,17 @@ export function App() {
     setActiveTab(getTabFromPath(initial));
 
     return unsubscribe;
+  }, []);
+
+  // Initialize WebSocket connections on mount
+  useEffect(() => {
+    connectGateway();
+    connectRelay();
+
+    return () => {
+      disconnectGateway();
+      disconnectRelay();
+    };
   }, []);
 
   // Determine which page to render

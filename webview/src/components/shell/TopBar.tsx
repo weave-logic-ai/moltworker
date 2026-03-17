@@ -1,18 +1,34 @@
 /**
- * TopBar — Status bar with breadcrumb, connection indicators, alert badges.
+ * TopBar -- Status bar with breadcrumb, connection indicators, alert badges.
  * Surfaces context-breaking information regardless of current screen.
  *
  * Layout: [= Drawer] | Breadcrumb | [status dots] | [Tool Drawer =]
+ *
+ * Status dots are wired to live connection state:
+ *   Dot 1: Glasses (from app-state, set by relay events)
+ *   Dot 2: Bridge relay connection
+ *   Dot 3: Agent/gateway status
+ *
+ * Colors: green=connected, amber=reconnecting, red=disconnected
  */
 
+import { useState, useEffect } from 'react';
 import type { AgentStatus } from '@/types';
 import { toggleLeftDrawer, toggleRightDrawer } from '@/store/app-state';
+import { getConnectionState, onStateChange, type GatewayConnectionState } from '@/lib/gateway';
+import { getRelayConnectionState, onRelayStateChange, type RelayConnectionState } from '@/lib/relay';
 
 interface TopBarProps {
   breadcrumb: string[];
   glassesConnected: boolean;
   bridgeConnected: boolean;
   agentStatus: AgentStatus;
+}
+
+function connDotClass(connected: boolean, reconnecting: boolean): string {
+  if (connected) return 'status-dot--success';
+  if (reconnecting) return 'status-dot--warning';
+  return 'status-dot--error';
 }
 
 const AGENT_STATUS_COLOR: Record<AgentStatus, string> = {
@@ -23,10 +39,34 @@ const AGENT_STATUS_COLOR: Record<AgentStatus, string> = {
   error: 'var(--destructive)',
 };
 
-export function TopBar({ breadcrumb, glassesConnected, bridgeConnected, agentStatus }: TopBarProps) {
+export function TopBar({ breadcrumb, glassesConnected, agentStatus }: TopBarProps) {
+  const [gwState, setGwState] = useState<GatewayConnectionState>(getConnectionState());
+  const [relayState, setRelayState] = useState<RelayConnectionState>(getRelayConnectionState());
+
+  useEffect(() => onStateChange((s) => setGwState(s)), []);
+  useEffect(() => onRelayStateChange((s) => setRelayState(s)), []);
+
   const breadcrumbText = breadcrumb.length > 0
     ? breadcrumb.join(' > ')
     : 'Clawdflare';
+
+  // Glasses: green if connected, red if not
+  const glassesDotClass = glassesConnected ? 'status-dot--success' : 'status-dot--error';
+
+  // Bridge relay: green=connected, amber=connecting, red=disconnected/error
+  const bridgeDotClass = connDotClass(
+    relayState === 'connected',
+    relayState === 'connecting',
+  );
+
+  // Agent/gateway status: use agent status color if gateway connected, else connection color
+  const agentDotColor = gwState === 'connected'
+    ? AGENT_STATUS_COLOR[agentStatus]
+    : gwState === 'connecting'
+      ? 'var(--warning)'
+      : 'var(--destructive)';
+
+  const agentGlow = agentStatus === 'thinking' && gwState === 'connected';
 
   return (
     <header style={{
@@ -73,21 +113,21 @@ export function TopBar({ breadcrumb, glassesConnected, bridgeConnected, agentSta
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
         {/* Glasses connection */}
         <span
-          className={`status-dot ${glassesConnected ? 'status-dot--success' : 'status-dot--error'}`}
+          className={`status-dot ${glassesDotClass}`}
           title={glassesConnected ? 'Glasses connected' : 'Glasses disconnected'}
         />
 
         {/* Bridge connection */}
         <span
-          className={`status-dot ${bridgeConnected ? 'status-dot--success' : 'status-dot--idle'}`}
-          title={bridgeConnected ? 'Bridge connected' : 'Bridge disconnected'}
+          className={`status-dot ${bridgeDotClass}`}
+          title={`Bridge: ${relayState}`}
         />
 
         {/* Agent status */}
         <span
-          className={`status-dot ${agentStatus === 'thinking' ? 'status-dot--glow' : ''}`}
-          style={{ background: AGENT_STATUS_COLOR[agentStatus] }}
-          title={`Agent: ${agentStatus}`}
+          className={`status-dot ${agentGlow ? 'status-dot--glow' : ''}`}
+          style={{ background: agentDotColor }}
+          title={`Agent: ${agentStatus} | Gateway: ${gwState}`}
         />
 
         {/* Time */}

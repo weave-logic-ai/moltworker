@@ -4,17 +4,19 @@
  * 8 collapsible sections for each sensor type:
  * Microphone, Camera, Button, Speaker, Battery, WiFi, Location, IMU.
  *
- * Each section displays label:value monospace pairs with placeholder data.
- * Slide-in animation from right.
+ * Wired to sensor-store for live data from the bridge relay.
+ * Falls back to placeholder values when no live data is available.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { closeAllOverlays } from '@/store/app-state';
+import { getSensorState, subscribeSensorState, type SensorState } from '@/store/sensor-store';
+import { getRelayConnectionState, onRelayStateChange, type RelayConnectionState } from '@/lib/relay';
 import { renderSensorContent } from './SensorPanels';
 import type { SensorContent } from './SensorPanels';
 
 // ---------------------------------------------------------------------------
-// Sensor Section Definition & Sample Data
+// Sensor Section Definition
 // ---------------------------------------------------------------------------
 
 interface SensorSection {
@@ -24,102 +26,112 @@ interface SensorSection {
   content: SensorContent;
 }
 
-const SENSOR_SECTIONS: SensorSection[] = [
-  {
-    id: 'mic',
-    name: 'Microphone',
-    status: 'connected',
-    content: {
-      type: 'microphone',
-      transcription: 'Show me the deploy status for the auth service...',
-      audioLevel: 65,
-      vadStatus: 'Active',
-      language: 'en-US',
+/** Build sensor sections from live state. */
+function buildSections(sensor: SensorState, relayState: RelayConnectionState): SensorSection[] {
+  const relayUp = relayState === 'connected';
+
+  return [
+    {
+      id: 'mic',
+      name: 'Microphone',
+      status: relayUp && sensor.transcription.text ? 'connected' : relayUp ? 'idle' : 'disconnected',
+      content: {
+        type: 'microphone',
+        transcription: sensor.transcription.text || '(waiting for transcription...)',
+        audioLevel: sensor.transcription.confidence > 0 ? Math.round(sensor.transcription.confidence * 100) : 0,
+        vadStatus: sensor.transcription.isFinal ? 'Final' : sensor.transcription.text ? 'Active' : 'Idle',
+        language: sensor.transcription.language || 'en-US',
+      },
     },
-  },
-  {
-    id: 'camera',
-    name: 'Camera',
-    status: 'idle',
-    content: {
-      type: 'camera',
-      lastPhoto: null,
-      resolution: '1280x720',
-      streamStatus: 'Off',
+    {
+      id: 'camera',
+      name: 'Camera',
+      status: sensor.lastPhoto ? 'connected' : 'idle',
+      content: {
+        type: 'camera',
+        lastPhoto: sensor.lastPhoto ? `${sensor.lastPhoto.mimeType} (${sensor.lastPhoto.size}B)` : null,
+        resolution: '1280x720',
+        streamStatus: sensor.lastPhoto ? 'Captured' : 'Off',
+      },
     },
-  },
-  {
-    id: 'button',
-    name: 'Button',
-    status: 'connected',
-    content: {
-      type: 'button',
-      events: [
-        { time: '21:20:14', action: 'single press' },
-        { time: '21:18:45', action: 'long press' },
-        { time: '21:15:32', action: 'single press' },
-        { time: '21:12:01', action: 'double press' },
-        { time: '21:08:22', action: 'single press' },
-      ],
+    {
+      id: 'button',
+      name: 'Button',
+      status: relayUp && sensor.buttonHistory.length > 0 ? 'connected' : relayUp ? 'idle' : 'disconnected',
+      content: {
+        type: 'button',
+        events: sensor.buttonHistory.length > 0
+          ? sensor.buttonHistory.map((evt) => ({
+              time: new Date(evt.timestamp).toLocaleTimeString([], { hour12: false }),
+              action: `${evt.pressType} press`,
+            }))
+          : [{ time: '--:--:--', action: 'no events' }],
+      },
     },
-  },
-  {
-    id: 'speaker',
-    name: 'Speaker',
-    status: 'connected',
-    content: {
-      type: 'speaker',
-      ttsQueue: 2,
-      playbackStatus: 'Playing',
-      volume: 72,
+    {
+      id: 'speaker',
+      name: 'Speaker',
+      status: relayUp ? 'connected' : 'disconnected',
+      content: {
+        type: 'speaker',
+        ttsQueue: sensor.ttsStatus === 'speaking' ? 1 : 0,
+        playbackStatus: sensor.ttsStatus === 'speaking'
+          ? 'Playing'
+          : sensor.ttsStatus === 'done'
+            ? 'Done'
+            : sensor.ttsStatus === 'error'
+              ? 'Error'
+              : 'Idle',
+        volume: 72,
+      },
     },
-  },
-  {
-    id: 'battery',
-    name: 'Battery',
-    status: 'connected',
-    content: {
-      type: 'battery',
-      glassesPercent: 78,
-      casePercent: 94,
-      charging: false,
+    {
+      id: 'battery',
+      name: 'Battery',
+      status: sensor.battery.level > 0 ? 'connected' : relayUp ? 'idle' : 'disconnected',
+      content: {
+        type: 'battery',
+        glassesPercent: sensor.battery.level,
+        casePercent: 0,
+        charging: sensor.battery.charging,
+      },
     },
-  },
-  {
-    id: 'wifi',
-    name: 'WiFi',
-    status: 'connected',
-    content: {
-      type: 'wifi',
-      ssid: 'WeaveLogic-5G',
-      signalBars: 3,
-      connectionStatus: 'Connected',
+    {
+      id: 'wifi',
+      name: 'WiFi',
+      status: relayUp ? 'connected' : 'disconnected',
+      content: {
+        type: 'wifi',
+        ssid: relayUp ? 'Bridge Active' : '--',
+        signalBars: relayUp ? 3 : 0,
+        connectionStatus: relayUp ? 'Connected' : 'Disconnected',
+      },
     },
-  },
-  {
-    id: 'location',
-    name: 'Location',
-    status: 'idle',
-    content: {
-      type: 'location',
-      lat: '37.7749',
-      lng: '-122.4194',
-      accuracy: '12m',
-      lastUpdate: '30s ago',
+    {
+      id: 'location',
+      name: 'Location',
+      status: 'idle',
+      content: {
+        type: 'location',
+        lat: '--',
+        lng: '--',
+        accuracy: '--',
+        lastUpdate: 'n/a',
+      },
     },
-  },
-  {
-    id: 'imu',
-    name: 'IMU',
-    status: 'connected',
-    content: {
-      type: 'imu',
-      accelX: '0.02',
-      accelY: '-0.98',
-      accelZ: '0.11',
+    {
+      id: 'imu',
+      name: 'IMU',
+      status: relayUp ? 'idle' : 'disconnected',
+      content: {
+        type: 'imu',
+        accelX: '--',
+        accelY: '--',
+        accelZ: '--',
+      },
     },
-  },
-];
+  ];
+}
 
 // ---------------------------------------------------------------------------
 // Status dot color mapping
@@ -139,6 +151,13 @@ export function RightDrawer() {
   const [openSections, setOpenSections] = useState<Set<string>>(
     new Set(['mic', 'battery', 'wifi']),
   );
+  const [sensorState, setSensorState] = useState<SensorState>(getSensorState());
+  const [relayState, setRelayState] = useState<RelayConnectionState>(getRelayConnectionState());
+
+  useEffect(() => subscribeSensorState((s) => setSensorState(s)), []);
+  useEffect(() => onRelayStateChange((s) => setRelayState(s)), []);
+
+  const sections = buildSections(sensorState, relayState);
 
   const toggleSection = (id: string) => {
     setOpenSections((prev) => {
@@ -173,7 +192,21 @@ export function RightDrawer() {
         padding: '16px 20px 12px',
         flexShrink: 0,
       }}>
-        <span style={{ fontSize: '16px', fontWeight: 600, letterSpacing: '-0.2px' }}>Debug</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '16px', fontWeight: 600, letterSpacing: '-0.2px' }}>Debug</span>
+          <span style={{
+            fontSize: '10px',
+            padding: '2px 8px',
+            borderRadius: '999px',
+            background: relayState === 'connected' ? 'rgba(78,204,163,0.15)' : 'rgba(239,68,68,0.15)',
+            color: relayState === 'connected' ? 'var(--success)' : 'var(--destructive)',
+            fontWeight: 500,
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px',
+          }}>
+            {relayState === 'connected' ? 'LIVE' : relayState === 'connecting' ? 'CONNECTING' : 'OFFLINE'}
+          </span>
+        </div>
         <button
           onClick={closeAllOverlays}
           style={{
@@ -197,7 +230,7 @@ export function RightDrawer() {
         padding: '0 0 20px',
         WebkitOverflowScrolling: 'touch',
       }}>
-        {SENSOR_SECTIONS.map((section) => {
+        {sections.map((section) => {
           const isOpen = openSections.has(section.id);
           return (
             <div key={section.id} style={{ borderBottom: '1px solid var(--border)' }}>
